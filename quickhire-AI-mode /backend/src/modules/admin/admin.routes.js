@@ -290,11 +290,15 @@ const slugify = (s = '') =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
-// i18n string schema — accepts either a plain string or a multi-locale object.
-// The customer-facing service.routes.js projectForCountry() will localise it
-// at read time using the caller's locale.
+// i18n string schema — accepts either a plain string (incl. empty) or a
+// multi-locale object. Empty strings are permitted because the customer-facing
+// service.routes.js projectForCountry() will substitute name/description from
+// the i18n object and falls back to the English value or skips empty fields.
+//
+// SCHEMA_ACCEPT_EMPTY_FIX_V1: removed .min(1) from the string branch so that
+// editing a service that had no tagline (sent as '') no longer 422s.
 const I18nStringSchema = z.union([
-  z.string().min(1).max(2000),
+  z.string().max(2000),
   z.object({
     en:      z.string().optional(),
     hi:      z.string().optional(),

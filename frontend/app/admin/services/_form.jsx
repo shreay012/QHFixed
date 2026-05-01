@@ -636,7 +636,10 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
         name:         nameI18n,
         category:     form.category || '',
         description:  descI18n,
-        tagline:      Object.keys(taglineI18n).length ? taglineI18n : '',
+        // Always ship as an object so the backend zod union always matches the
+        // object branch (an empty string used to fail because the union's
+        // string branch required min(1); both ends now accept empty too).
+        tagline:      taglineI18n,
         technologies: techObjects,
         notIncluded:  form.notIncluded.filter(Boolean),
         faqs:         form.faqs,
