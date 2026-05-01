@@ -17,7 +17,7 @@
 - Production-optimized
 
 ### ✅ GitHub Repository
-- URL: https://github.com/shreay012/Quickhire-multicountry
+- URL: https://github.com/shreay012/QHFixed
 - Code: All 755+ objects pushed to main branch
 - Status: Ready for deployment
 
@@ -65,7 +65,7 @@
 
 ### STEP 2: Add All 5 Secrets to GitHub (5 min)
 
-Go to: https://github.com/shreay012/Quickhire-multicountry/settings/secrets/actions
+Go to: https://github.com/shreay012/QHFixed/settings/secrets/actions
 
 Add 5 secrets:
 ```
@@ -85,7 +85,7 @@ git push origin main
 ```
 
 Watch deployment:
-- Go to: https://github.com/shreay012/Quickhire-multicountry/actions
+- Go to: https://github.com/shreay012/QHFixed/actions
 - Frontend deploys first (~30 sec) ✅
 - Backend deploys next (~5-10 min) ✅
 - Both show green checkmarks when complete

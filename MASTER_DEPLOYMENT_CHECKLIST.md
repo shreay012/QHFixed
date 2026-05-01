@@ -89,7 +89,7 @@
 ## 📋 SECTION 3: ADD GITHUB SECRETS (5 minutes)
 
 ### Go to GitHub Secrets Page
-- [ ] Go to: https://github.com/shreay012/Quickhire-multicountry
+- [ ] Go to: https://github.com/shreay012/QHFixed
 - [ ] Click "Settings" (top menu)
 - [ ] Left sidebar → "Secrets and variables"
 - [ ] Click "Actions"
@@ -165,7 +165,7 @@ git push origin main
 ## 📋 SECTION 5: MONITOR DEPLOYMENT (5-15 minutes)
 
 ### Watch Frontend Deploy
-- [ ] Go to: https://github.com/shreay012/Quickhire-multicountry
+- [ ] Go to: https://github.com/shreay012/QHFixed
 - [ ] Click "Actions" tab
 - [ ] You should see: "Deploy Frontend to Vercel"
 - [ ] Status: 🟡 In Progress → 🟢 Completed
@@ -297,7 +297,7 @@ Your app is ready to deploy. Follow this checklist from top to bottom, and you'l
 
 ---
 
-**Repository**: https://github.com/shreay012/Quickhire-multicountry  
+**Repository**: https://github.com/shreay012/QHFixed  
 **Status**: Ready for deployment ✅  
 **Your next action**: Start Section 1 (Vercel Setup)  
 

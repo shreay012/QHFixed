@@ -214,7 +214,7 @@ You're just **44-50 minutes** away from having a live booking platform on the in
 ## 📞 SUPPORT & RESOURCES
 
 **All 40 deployment guides** are in your GitHub repository:
-https://github.com/shreay012/Quickhire-multicountry
+https://github.com/shreay012/QHFixed
 
 **Key files**:
 - EXECUTABLE_DEPLOYMENT_CHECKLIST.md - **Start here!**
@@ -222,7 +222,7 @@ https://github.com/shreay012/Quickhire-multicountry
 - RENDER_FORM_COMPLETE_GUIDE.md - Fill form
 - verify-deployment.sh - Check deployment
 
-**GitHub Actions**: https://github.com/shreay012/Quickhire-multicountry/actions
+**GitHub Actions**: https://github.com/shreay012/QHFixed/actions
 
 ---
 
@@ -234,7 +234,7 @@ Your QuickHire application is ready to change the world.
 
 ---
 
-**Repository**: https://github.com/shreay012/Quickhire-multicountry  
+**Repository**: https://github.com/shreay012/QHFixed  
 **Status**: ✅ 100% Infrastructure Ready  
 **Time Remaining**: ~44-50 minutes  
 **Cost**: $0/month  

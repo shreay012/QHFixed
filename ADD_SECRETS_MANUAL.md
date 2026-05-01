@@ -31,7 +31,7 @@ See FINAL_DEPLOYMENT_SETUP.md to collect these values first!
 ## ✅ Step 1: Open GitHub Settings
 
 ```
-1. Go to: https://github.com/shreay012/Quickhire-multicountry
+1. Go to: https://github.com/shreay012/QHFixed
 2. Click "Settings" tab (top right)
 3. Left sidebar → "Secrets and variables"
 4. Click "Actions"

@@ -41,7 +41,7 @@
 ## 🔐 ADD ALL 5 TO GITHUB (3 min)
 
 ```
-Go to: https://github.com/shreay012/Quickhire-multicountry/settings/secrets/actions
+Go to: https://github.com/shreay012/QHFixed/settings/secrets/actions
 
 Click "New repository secret" 5 times and add:
 
@@ -75,7 +75,7 @@ git push origin main
 ## 👀 WATCH IT DEPLOY (15 min)
 
 ```
-Go to: https://github.com/shreay012/Quickhire-multicountry/actions
+Go to: https://github.com/shreay012/QHFixed/actions
 
 You'll see 2 workflows:
 ✅ Deploy Frontend to Vercel (30 sec)

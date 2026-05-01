@@ -289,7 +289,7 @@ Your application is built, tested, and ready for production.
 ## 📞 SUPPORT
 
 - **Documentation**: All guides in this repo
-- **GitHub**: https://github.com/shreay012/Quickhire-multicountry
+- **GitHub**: https://github.com/shreay012/QHFixed
 - **Vercel**: https://vercel.com/docs
 - **Render**: https://docs.render.com
 

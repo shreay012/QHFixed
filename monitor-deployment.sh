@@ -19,7 +19,7 @@ NC='\033[0m'
 # Configuration
 FRONTEND_URL="https://quickhire-frontend.vercel.app"
 BACKEND_URL="https://quickhire-backend.onrender.com/health"
-GITHUB_ACTIONS_URL="https://api.github.com/repos/shreay012/Quickhire-multicountry/actions/runs"
+GITHUB_ACTIONS_URL="https://api.github.com/repos/shreay012/QHFixed/actions/runs"
 
 # Counters
 ITERATION=0
@@ -68,7 +68,7 @@ check_backend() {
 check_github_actions() {
     # Try to get latest workflow run status
     if command -v gh &> /dev/null; then
-        local status=$(gh run list --repo shreay012/Quickhire-multicountry --limit 1 --json status --jq '.[0].status' 2>/dev/null || echo "unknown")
+        local status=$(gh run list --repo shreay012/QHFixed --limit 1 --json status --jq '.[0].status' 2>/dev/null || echo "unknown")
         
         case "$status" in
             "completed")
@@ -154,7 +154,7 @@ if [ $ITERATION -ge $MAX_ITERATIONS ]; then
     echo ""
     echo -e "${YELLOW}⚠️  Monitoring timeout reached (4 hours)${NC}"
     echo "Check GitHub Actions for detailed deployment status:"
-    echo "  https://github.com/shreay012/Quickhire-multicountry/actions"
+    echo "  https://github.com/shreay012/QHFixed/actions"
 fi
 
 echo ""

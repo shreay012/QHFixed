@@ -72,7 +72,7 @@ From Render:
 ## ➕ ADD TO GITHUB (5 Minutes)
 
 ```
-1. Go to: https://github.com/shreay012/Quickhire-multicountry
+1. Go to: https://github.com/shreay012/QHFixed
 2. Settings → Secrets and variables → Actions
 3. Click "New repository secret" (5 times)
 

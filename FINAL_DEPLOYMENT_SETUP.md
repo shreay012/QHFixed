@@ -248,7 +248,7 @@ RENDER_SERVICE_ID: __________________________
 ## 🎉 After Deployment
 
 Your app will be live at:
-- **Frontend:** https://github.com/shreay012/Quickhire-multicountry
+- **Frontend:** https://github.com/shreay012/QHFixed
 - **Backend:** https://dashboard.render.com
 
 Every push = automatic new deployment! 🚀

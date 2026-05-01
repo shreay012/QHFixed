@@ -9,7 +9,7 @@
 You're on the Render "New Web Service" page. Here's exactly what to enter in each field:
 
 ### ✅ Already Correct (Don't Change)
-- **Source Code**: shreay012 / Quickhire-multicountry
+- **Source Code**: shreay012 / QHFixed
 - **Language**: Docker
 - **Branch**: main
 - **Root Directory**: backend
@@ -18,7 +18,7 @@ You're on the Render "New Web Service" page. Here's exactly what to enter in eac
 
 ### 🔴 MUST FIX: Name Field
 
-**Current**: `Quickhire-multicountry`  
+**Current**: `QHFixed`  
 **Change to**: `quickhire-backend`
 
 **How to fix**:
@@ -129,7 +129,7 @@ Get these from your Razorpay dashboard:
 
 ```
 Name: quickhire-backend ✓
-Repository: shreay012/Quickhire-multicountry ✓
+Repository: shreay012/QHFixed ✓
 Branch: main ✓
 Root Directory: backend ✓
 Language: Docker ✓

@@ -95,7 +95,7 @@ git push -u origin main --force
 
 Then verify on GitHub:
 ```
-https://github.com/shreay012/Quickhire-multicountry
+https://github.com/shreay012/QHFixed
 ```
 
 Should see all your code! ✅

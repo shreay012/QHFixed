@@ -68,12 +68,12 @@
 
 ```
 ☐ Step 1: Fix Name Field
-  ☐ Change from: "Quickhire-multicountry"
+  ☐ Change from: "QHFixed"
   ☐ Change to: "quickhire-backend"
   ☐ Press Tab to confirm
 
 ☐ Step 2: Verify Settings (Don't change these)
-  ☐ Repository: shreay012/Quickhire-multicountry ✓
+  ☐ Repository: shreay012/QHFixed ✓
   ☐ Branch: main ✓
   ☐ Root Directory: backend ✓
   ☐ Language: Docker ✓
@@ -190,7 +190,7 @@
   ☐ Both workflows start simultaneously
 
 ☐ Step 4: Watch Deployment Progress
-  ☐ Go to: https://github.com/shreay012/Quickhire-multicountry/actions
+  ☐ Go to: https://github.com/shreay012/QHFixed/actions
   ☐ You'll see two workflows running:
     - "Deploy Frontend to Vercel" (30 seconds)
     - "Deploy Backend to Render" (5-10 minutes)

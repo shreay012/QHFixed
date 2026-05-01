@@ -159,7 +159,7 @@ Write them down here:
 ## 🟢 STEP 5: ADD SECRETS TO GITHUB (Right Now!)
 
 ### Action 1: Open GitHub
-Go to: **https://github.com/shreay012/Quickhire-multicountry**
+Go to: **https://github.com/shreay012/QHFixed**
 
 ### Action 2: Go to Settings
 Click "Settings" button (top menu bar)
@@ -254,7 +254,7 @@ git push origin main
 
 Wait for it to complete. You should see:
 ```
-To https://github.com/shreay012/Quickhire-multicountry.git
+To https://github.com/shreay012/QHFixed.git
    ba3fce8..xxxxx  main -> main
 ```
 
@@ -265,7 +265,7 @@ To https://github.com/shreay012/Quickhire-multicountry.git
 ## 👀 STEP 7: WATCH DEPLOYMENT (Right Now!)
 
 ### Action 1: Go to GitHub Actions
-Open: **https://github.com/shreay012/Quickhire-multicountry/actions**
+Open: **https://github.com/shreay012/QHFixed/actions**
 
 ### Action 2: Watch Workflows
 You should see two workflows running:

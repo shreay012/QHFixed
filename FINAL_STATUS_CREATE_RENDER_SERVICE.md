@@ -35,7 +35,7 @@
 **Quick summary**:
 1. Click "Create new service"
 2. Select "Web Service"
-3. Connect GitHub: `shreay012/Quickhire-multicountry`
+3. Connect GitHub: `shreay012/QHFixed`
 4. Name: `quickhire-backend`
 5. Root Directory: `backend`
 6. Add environment variables (use `RENDER_ENV_VARS_QUICK_REFERENCE.md`)
@@ -131,7 +131,7 @@ TOTAL: ~24 MINUTES
 ## 💾 GITHUB REPOSITORY
 
 ```
-URL: https://github.com/shreay012/Quickhire-multicountry
+URL: https://github.com/shreay012/QHFixed
 Code: 755+ objects pushed ✅
 Workflows: 2 active ✅
 Documentation: 20+ guides ✅

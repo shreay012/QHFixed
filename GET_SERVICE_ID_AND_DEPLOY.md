@@ -51,7 +51,7 @@ RENDER_SERVICE_ID    = srv_????????????? (PENDING)
 
 ### Option A: Add Secrets to GitHub Manually (2 min)
 ```
-1. Go: https://github.com/shreay012/Quickhire-multicountry/settings/secrets/actions
+1. Go: https://github.com/shreay012/QHFixed/settings/secrets/actions
 2. Click "New repository secret" five times
 3. Add each of the 5 values above (exact names, case-sensitive)
 4. Click "Add secret" after each one
@@ -92,7 +92,7 @@ That's it! GitHub Actions will:
 
 ## 👀 WATCH DEPLOYMENT
 
-Go to: https://github.com/shreay012/Quickhire-multicountry/actions
+Go to: https://github.com/shreay012/QHFixed/actions
 
 You'll see both workflows running. Wait for green checkmarks.
 

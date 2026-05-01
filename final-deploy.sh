@@ -40,7 +40,7 @@ echo ""
 
 # Display current repository status
 echo -e "${BLUE}📊 Repository Status${NC}"
-echo "URL: https://github.com/shreay012/Quickhire-multicountry"
+echo "URL: https://github.com/shreay012/QHFixed"
 echo "Branch: main"
 echo "Latest commit:"
 git log -1 --oneline
@@ -99,7 +99,7 @@ if [ "$CONFIGURED_COUNT" -ge 5 ]; then
         echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo "📊 Watch Deployment Progress:"
-        echo "   https://github.com/shreay012/Quickhire-multicountry/actions"
+        echo "   https://github.com/shreay012/QHFixed/actions"
         echo ""
         echo "⏱️  Timeline:"
         echo "   Frontend (Vercel):  30 seconds"

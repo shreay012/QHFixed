@@ -7,7 +7,7 @@
 ## ✅ WHAT'S DONE
 
 - ✅ Full-stack application built (Next.js + Express.js)
-- ✅ Code on GitHub: https://github.com/shreay012/Quickhire-multicountry
+- ✅ Code on GitHub: https://github.com/shreay012/QHFixed
 - ✅ GitHub Actions workflows configured
 - ✅ All infrastructure ready (Vercel, Render, MongoDB, Redis, etc.)
 - ✅ 7 deployment guides created with step-by-step instructions
@@ -29,7 +29,7 @@ Still need:
 **→ Use QUICK_REFERENCE.md** to see exact URLs and steps
 
 ### Step 2: Add All 5 to GitHub (5 min)
-Go to: https://github.com/shreay012/Quickhire-multicountry/settings/secrets/actions
+Go to: https://github.com/shreay012/QHFixed/settings/secrets/actions
 
 Add each of the 5 values as a repository secret
 
@@ -42,7 +42,7 @@ git push origin main
 ```
 
 ### Step 4: Watch It Deploy (15 min)
-Go to: https://github.com/shreay012/Quickhire-multicountry/actions
+Go to: https://github.com/shreay012/QHFixed/actions
 
 Watch your workflows:
 - Frontend deploys to Vercel (~30 sec)
@@ -250,6 +250,6 @@ Your application is built. Your infrastructure is ready. Your automation is conf
 
 ---
 
-Repository: https://github.com/shreay012/Quickhire-multicountry  
+Repository: https://github.com/shreay012/QHFixed  
 Last updated: April 28, 2026  
 Status: Ready for deployment

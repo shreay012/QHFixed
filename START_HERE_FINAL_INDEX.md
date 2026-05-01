@@ -168,7 +168,7 @@ Health Check:       https://quickhire-backend.onrender.com/health
 ## 💾 REPOSITORY STATUS
 
 ```
-GitHub: https://github.com/shreay012/Quickhire-multicountry
+GitHub: https://github.com/shreay012/QHFixed
 Code: ✅ All pushed (755+ objects)
 Workflows: ✅ 2 active (auto-deploy configured)
 Guides: ✅ 37 comprehensive documents
@@ -223,7 +223,7 @@ Then we're done! 🎉
 
 ---
 
-**Repository**: https://github.com/shreay012/Quickhire-multicountry  
+**Repository**: https://github.com/shreay012/QHFixed  
 **Status**: Infrastructure Complete ✅  
 **Time to Live**: ~44 minutes  
 **Cost**: $0/month on free tiers  

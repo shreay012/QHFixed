@@ -57,7 +57,7 @@
 
 Once you have all 5 values:
 
-1. Go to: https://github.com/shreay012/Quickhire-multicountry/settings/secrets/actions
+1. Go to: https://github.com/shreay012/QHFixed/settings/secrets/actions
 2. Click "New repository secret" (5 times)
 3. Add each value:
    - `VERCEL_TOKEN` = [your value]
@@ -75,7 +75,7 @@ git push origin main
 
 ### STEP 6: Watch Deployment
 
-Go to: https://github.com/shreay012/Quickhire-multicountry/actions
+Go to: https://github.com/shreay012/QHFixed/actions
 
 Watch both workflows complete:
 - Frontend → Vercel (30 seconds)

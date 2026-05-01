@@ -68,7 +68,7 @@ Choose the first option (not Static Site, not Background Worker)
 
 ### Step 3: Connect Repository
 ```
-Select: shreay012/Quickhire-multicountry
+Select: shreay012/QHFixed
 Branch: main
 ```
 

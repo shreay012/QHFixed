@@ -70,7 +70,7 @@ Open these links and copy the values:
 
 ### ✅ Step 2: Add to GitHub Secrets (5 minutes)
 
-Go to: **https://github.com/shreay012/Quickhire-multicountry**
+Go to: **https://github.com/shreay012/QHFixed**
 
 1. Click **Settings** tab (top right)
 2. Left sidebar → **Secrets and variables**
@@ -148,7 +148,7 @@ App is LIVE! 🎉
 
 After you push, watch it happen:
 
-1. **GitHub Actions**: https://github.com/shreay012/Quickhire-multicountry/actions
+1. **GitHub Actions**: https://github.com/shreay012/QHFixed/actions
    - See workflow running in real-time
    - Green checkmark = success
 
@@ -283,7 +283,7 @@ Full documentation available:
 
 **Your QuickHire platform is production-ready!**
 
-Repository: https://github.com/shreay012/Quickhire-multicountry
+Repository: https://github.com/shreay012/QHFixed
 Status: 95% done, 5% remains (5 min secrets + 1 min push)
 Deployment: Fully automated
 

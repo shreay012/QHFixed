@@ -62,7 +62,7 @@ Your complete full-stack QuickHire booking platform is built, documented, and re
 - Component tests
 
 ### ✅ Git Repository
-- **URL**: https://github.com/shreay012/Quickhire-multicountry
+- **URL**: https://github.com/shreay012/QHFixed
 - **Status**: Main branch with all code
 - **Size**: 755+ objects (55.63 MiB)
 - **Workflows**: GitHub Actions configured
@@ -152,7 +152,7 @@ Render dashboard → Backend deployment
 ## 📁 File Structure
 
 ```
-QuickHire-multicountry/
+QHFixed/
 ├── .github/workflows/
 │   ├── deploy-frontend.yml      ← Auto-deploy to Vercel
 │   └── deploy-backend.yml       ← Auto-deploy to Render
@@ -436,7 +436,7 @@ Only 5 minutes remain before your app is live!
 
 ## 📞 Support & Resources
 
-- **GitHub**: https://github.com/shreay012/Quickhire-multicountry
+- **GitHub**: https://github.com/shreay012/QHFixed
 - **Vercel Docs**: https://vercel.com/docs
 - **Render Docs**: https://docs.render.com
 - **Next.js Docs**: https://nextjs.org/docs

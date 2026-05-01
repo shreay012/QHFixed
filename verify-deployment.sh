@@ -20,7 +20,7 @@ echo ""
 
 # Check 1: GitHub Repository
 echo -e "${BLUE}1️⃣ Checking GitHub Repository...${NC}"
-if git remote -v | grep -q "shreay012/Quickhire-multicountry"; then
+if git remote -v | grep -q "shreay012/QHFixed"; then
     echo -e "${GREEN}✅ Repository configured correctly${NC}"
 else
     echo -e "${RED}❌ Repository not found${NC}"
@@ -88,7 +88,7 @@ echo ""
 echo -e "${BLUE}6️⃣ Checking Deployment Status...${NC}"
 echo ""
 echo "📊 View real-time deployment:"
-echo "   GitHub Actions: https://github.com/shreay012/Quickhire-multicountry/actions"
+echo "   GitHub Actions: https://github.com/shreay012/QHFixed/actions"
 echo ""
 echo "🌍 Access your app:"
 echo "   Frontend: https://quickhire-frontend.vercel.app"

@@ -26,7 +26,7 @@ From Render:
 ## ✅ STEP 1: GO TO GITHUB SECRETS PAGE
 
 ### Open Your Repository
-1. Go to: **https://github.com/shreay012/Quickhire-multicountry**
+1. Go to: **https://github.com/shreay012/QHFixed**
 2. Make sure you're logged in to GitHub
 
 ### Navigate to Secrets
@@ -186,7 +186,7 @@ When you push:
 5. **Your app is LIVE!** 🎉
 
 ### Monitor Deployment
-1. Go to: **https://github.com/shreay012/Quickhire-multicountry**
+1. Go to: **https://github.com/shreay012/QHFixed**
 2. Click **"Actions"** tab (top menu)
 3. You'll see workflows running:
    ```
@@ -288,4 +288,4 @@ Your QuickHire application is now set to auto-deploy every time you push code!
 
 **Deployment Status: LIVE IN PROGRESS** 🚀
 
-Go to https://github.com/shreay012/Quickhire-multicountry → Actions to watch!
+Go to https://github.com/shreay012/QHFixed → Actions to watch!

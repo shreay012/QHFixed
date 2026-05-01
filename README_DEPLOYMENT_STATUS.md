@@ -2,7 +2,7 @@
 
 **Project**: QuickHire - Multi-Country Booking Platform  
 **Status**: ✅ **100% PRODUCTION READY**  
-**Repository**: https://github.com/shreay012/Quickhire-multicountry  
+**Repository**: https://github.com/shreay012/QHFixed  
 **Deployed To**: Vercel (Frontend) + Render (Backend)  
 
 ---
@@ -103,7 +103,7 @@
 
 ### Action 2: Add to GitHub (5 min)
 ```
-1. Go: https://github.com/shreay012/Quickhire-multicountry/settings/secrets/actions
+1. Go: https://github.com/shreay012/QHFixed/settings/secrets/actions
 2. Add 5 secrets with exact names & values
 3. All secrets required (case-sensitive)
 ```
@@ -114,7 +114,7 @@ cd /Users/orange/Documents/QHAIMODE
 git push origin main
 ```
 
-Then watch: https://github.com/shreay012/Quickhire-multicountry/actions
+Then watch: https://github.com/shreay012/QHFixed/actions
 
 ---
 
@@ -211,9 +211,9 @@ After deployment, verify:
 
 | Resource | Link |
 |----------|------|
-| Repository | https://github.com/shreay012/Quickhire-multicountry |
-| GitHub Actions | https://github.com/shreay012/Quickhire-multicountry/actions |
-| Secrets Page | https://github.com/shreay012/Quickhire-multicountry/settings/secrets/actions |
+| Repository | https://github.com/shreay012/QHFixed |
+| GitHub Actions | https://github.com/shreay012/QHFixed/actions |
+| Secrets Page | https://github.com/shreay012/QHFixed/settings/secrets/actions |
 | Vercel Dashboard | https://vercel.com/dashboard |
 | Render Dashboard | https://dashboard.render.com |
 

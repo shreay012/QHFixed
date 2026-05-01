@@ -14,7 +14,7 @@ Your full-stack application is ready to deploy. Here's the final summary.
 - **Documentation**: Complete API & Architecture docs
 
 ### 2. ✅ Code on GitHub
-- **Repository**: https://github.com/shreay012/Quickhire-multicountry
+- **Repository**: https://github.com/shreay012/QHFixed
 - **Branch**: main
 - **Status**: Ready for deployment
 - **Size**: 755 objects (55.63 MiB)
@@ -131,7 +131,7 @@ Get your 5 token values
 ### Add to GitHub
 
 ```
-1. https://github.com/shreay012/Quickhire-multicountry
+1. https://github.com/shreay012/QHFixed
 2. Settings → Secrets and variables → Actions
 3. Add 5 secrets (see ADD_SECRETS_MANUAL.md)
 ```
@@ -309,7 +309,7 @@ Your app is live! Share these URLs:
 ```
 Website: https://quickhire-frontend.vercel.app
 API: https://quickhire-backend.onrender.com
-GitHub: https://github.com/shreay012/Quickhire-multicountry
+GitHub: https://github.com/shreay012/QHFixed
 ```
 
 Every push to `main` automatically deploys everywhere! 🚀

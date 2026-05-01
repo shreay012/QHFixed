@@ -2,7 +2,7 @@
 
 **Date**: April 28, 2026  
 **Status**: ✅ 100% Infrastructure Complete  
-**Repository**: https://github.com/shreay012/Quickhire-multicountry  
+**Repository**: https://github.com/shreay012/QHFixed  
 
 ---
 
@@ -53,7 +53,7 @@ Total: ~20 minutes to LIVE app
 - Plus 26 additional comprehensive guides
 
 ### 📚 All guides available in repository
-Go to: https://github.com/shreay012/Quickhire-multicountry
+Go to: https://github.com/shreay012/QHFixed
 
 ---
 
@@ -142,7 +142,7 @@ Once all secrets are in GitHub:
 4. ✅ No downtime deployments
 
 **Watch deployments**:
-Go to: https://github.com/shreay012/Quickhire-multicountry/actions
+Go to: https://github.com/shreay012/QHFixed/actions
 
 ---
 
@@ -222,8 +222,8 @@ TOTAL TIME: ~21 MINUTES FROM NOW
 
 | Resource | Link |
 |----------|------|
-| GitHub Repo | https://github.com/shreay012/Quickhire-multicountry |
-| GitHub Actions | https://github.com/shreay012/Quickhire-multicountry/actions |
+| GitHub Repo | https://github.com/shreay012/QHFixed |
+| GitHub Actions | https://github.com/shreay012/QHFixed/actions |
 | Vercel Dashboard | https://vercel.com/dashboard |
 | Render Dashboard | https://dashboard.render.com |
 | MongoDB Atlas | https://cloud.mongodb.com |
