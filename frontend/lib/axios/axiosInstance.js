@@ -74,18 +74,32 @@ axiosInstance.interceptors.request.use(
 // --- Response: i18n flatten + 401 redirect + 429 rate-limit handling -----
 const PUBLIC_PREFIXES = [
   '/login',
+  '/signup',
   '/about-us',
   '/contact-us',
   '/how-it-works',
   '/faq',
   '/terms-and-conditions',
   '/cancellation-and-refund-policy',
+  '/privacy-policy',
   '/staff-login',
   '/admin',
   '/pm',
   '/resource',
   '/service-details',
+  '/book-your-resource',
+  '/support-chat',
 ];
+
+// PUBLIC_PATH_FIX_V1: strip a leading country segment (/in /ae /de /us /au)
+// before public-prefix matching. Path-routing redirects `/` to `/in/`, so the
+// homepage URL in the browser reads as `/in` — which used to bypass the
+// `path === '/'` short-circuit and trigger an unwanted login redirect.
+const COUNTRY_PREFIX_RE = /^\/(?:in|ae|de|us|au)(?=\/|$)/i;
+function stripCountry(p) {
+  if (!p) return p;
+  return p.replace(COUNTRY_PREFIX_RE, '') || '/';
+}
 
 /** Pending requests waiting for a token refresh */
 let _refreshing = false;
@@ -155,12 +169,13 @@ axiosInstance.interceptors.response.use(
       }
 
       // Refresh failed or no refresh token → redirect protected pages
-      const path = window.location.pathname || '/';
+      const rawPath = window.location.pathname || '/';
+      const path = stripCountry(rawPath);
       const isPublic =
         path === '/' || PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p + '/'));
       if (!isPublic) {
         clearAuthStorage();
-        window.location.replace(`/login?next=${encodeURIComponent(path)}`);
+        window.location.replace(`/login?next=${encodeURIComponent(rawPath)}`);
       }
     }
 
