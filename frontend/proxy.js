@@ -138,9 +138,18 @@ export function proxy(request) {
 
   const region = COUNTRY_REGIONS[detectedCountry] || null;
 
+  // GEO_COOKIE_SYNC_V1: when the detected country has *changed* from the
+  // previous cookie value (e.g. user travelled IN → UAE, VPN switch, IP
+  // re-detect on homepage), the locale and currency cookies almost
+  // certainly belong to the previous market and would render the new
+  // market's pages with the wrong language + wrong currency. Reset them
+  // to the new region's defaults whenever the country flips.
+  const prevCookieCountry = cookies.get('qh_country')?.value?.toUpperCase() || null;
+  const countryChanged = prevCookieCountry && prevCookieCountry !== detectedCountry;
+
   // ── 3. Determine locale ───────────────────────────────────────────────────
   const cookieLocale = cookies.get('qh_locale')?.value;
-  let locale = cookieLocale;
+  let locale = countryChanged ? null : cookieLocale;
   if (!locale) {
     const fromHeader = pickLocaleFromAcceptLanguage(headers.get('accept-language'));
     locale = region?.locale || fromHeader || DEFAULT_LOCALE;
@@ -149,7 +158,7 @@ export function proxy(request) {
 
   // ── 4. Determine currency ─────────────────────────────────────────────────
   const cookieCurrency = cookies.get('qh_currency')?.value;
-  let currency = cookieCurrency;
+  let currency = countryChanged ? null : cookieCurrency;
   if (!currency) {
     currency = region?.currency || DEFAULT_CURRENCY;
     if (!CURRENCY_CODES.includes(currency)) currency = DEFAULT_CURRENCY;
@@ -203,8 +212,11 @@ export function proxy(request) {
 
   // Always refresh qh_country cookie (so geo is always current)
   res.cookies.set('qh_country', detectedCountry, COOKIE_OPTS);
-  if (!cookieLocale) res.cookies.set('qh_locale', locale, COOKIE_OPTS);
-  if (!cookieCurrency) res.cookies.set('qh_currency', currency, COOKIE_OPTS);
+  // Re-write locale + currency when the country flipped (so a IN user who
+  // hits the site from UAE doesn't keep their old `en` + `INR` cookies)
+  // OR when they were never set.
+  if (!cookieLocale || countryChanged) res.cookies.set('qh_locale', locale, COOKIE_OPTS);
+  if (!cookieCurrency || countryChanged) res.cookies.set('qh_currency', currency, COOKIE_OPTS);
 
   // Headers for server components (next/headers().get('x-qh-country'))
   // and for backend Axios interceptor (X-Country → req.geo)
