@@ -257,13 +257,24 @@ const SummaryStep = () => {
   }, [jobDetails]); // Re-run if jobDetails changes, fallback dependency on jobId for initial mount
 
   // Calculate pricing from API response
-  // Backend job.pricing shape: { hourly, subtotal, tax, total, currency }
+  // Backend job.pricing shape: { hourly, subtotal, tax, total, currency,
+  //                              taxRate, taxName, taxType, taxInclusive }
   // Legacy shape:               { basePrice, gstAmount, totalPriceWithGst, discountAmount }
   const _tp = pricingData?.data?.totalPricing || {};
   const subtotal = _tp.basePrice ?? _tp.subtotal ?? 0;
   const gstAmount = _tp.gstAmount ?? _tp.tax ?? 0;
   const total = _tp.totalPriceWithGst ?? _tp.total ?? subtotal + gstAmount;
   const discountAmount = _tp.discountAmount ?? 0;
+
+  // COUNTRY_TAX_DISPLAY_V1: tax line is country-aware. Backend now ships
+  // taxName ("GST", "VAT", "MwSt.") and taxRate (0.18, 0.05, 0.19, …).
+  // When the country has no platform-level tax (US: type='none', rate=0),
+  // skip the line entirely so the summary doesn't show "GST 0%".
+  const taxName     = _tp.taxName ?? 'GST';
+  const taxRate     = typeof _tp.taxRate === 'number' ? _tp.taxRate : 0.18;
+  const taxType     = _tp.taxType ?? 'gst';
+  const showTaxLine = gstAmount > 0 && taxRate > 0 && taxType !== 'none';
+  const taxLabel    = `${taxName}${taxRate > 0 ? ` (${(taxRate * 100).toFixed(0)}%)` : ''}`;
 
   // Handle Continue - Check login and open Razorpay for logged-in users
   const handleContinue = async () => {
@@ -751,7 +762,7 @@ const SummaryStep = () => {
                       {tPay('hoursTotalCost')}
                     </Typography>
                     <Tooltip
-                      title="18% GST will be applied at checkout"
+                      title={showTaxLine ? `${taxLabel} will be applied at checkout` : 'No additional tax'}
                       arrow
                       placement="bottom"
                       componentsProps={{
@@ -1006,36 +1017,39 @@ const SummaryStep = () => {
             </Box>
           )}
 
-          {/* GST */}
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              mb: { xs: 2, sm: 2.5 },
-              pb: { xs: 2, sm: 2.5 },
-              borderBottom: "1px solid #E5E7EB",
-            }}
-          >
-            <Typography
+          {/* Tax (country-aware: GST 18% in IN, VAT 5% in AE, MwSt. 19% in DE,
+              GST 10% in AU, hidden entirely in US where type='none') */}
+          {showTaxLine && (
+            <Box
               sx={{
-                fontSize: { xs: "14px", sm: "15px", md: "16px" },
-                fontWeight: 400,
-                color: "#6B7280",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: { xs: 2, sm: 2.5 },
+                pb: { xs: 2, sm: 2.5 },
+                borderBottom: "1px solid #E5E7EB",
               }}
             >
-              GST (18%)
-            </Typography>
-            <Typography
-              sx={{
-                fontSize: { xs: "14px", sm: "15px", md: "16px" },
-                fontWeight: 400,
-                color: "#6B7280",
-              }}
-            >
-              {fmtMoney(gstAmount, { maxDigits: 2 })}
-            </Typography>
-          </Box>
+              <Typography
+                sx={{
+                  fontSize: { xs: "14px", sm: "15px", md: "16px" },
+                  fontWeight: 400,
+                  color: "#6B7280",
+                }}
+              >
+                {taxLabel}
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: { xs: "14px", sm: "15px", md: "16px" },
+                  fontWeight: 400,
+                  color: "#6B7280",
+                }}
+              >
+                {fmtMoney(gstAmount, { maxDigits: 2 })}
+              </Typography>
+            </Box>
+          )}
 
           {/* Total */}
           <Box
@@ -1066,7 +1080,10 @@ const SummaryStep = () => {
           </Box>
         </Box>
 
-        {/* GST Number Input */}
+        {/* Tax Registration Number Input — only show when the resolved tax
+            type is GST/VAT (skip in countries with type='none', e.g. US).
+            Label uses the country's own term (GSTIN, TRN, USt-IdNr, ABN). */}
+        {showTaxLine && (
         <Box sx={{ mt: { xs: 3, sm: 4 } }}>
           <Box
             sx={{
@@ -1083,7 +1100,7 @@ const SummaryStep = () => {
                 color: "#1F2937",
               }}
             >
-              GST Number (Optional)
+              {taxName} Number (Optional)
             </Typography>
             <Tooltip
               title="Provide GST details to claim tax benefits"
@@ -1116,7 +1133,7 @@ const SummaryStep = () => {
           </Box>
           <TextField
             fullWidth
-            placeholder="Enter GST Number (e.g., 27AAPCT1234A1Z0)"
+            placeholder={`Enter ${taxName} Number${taxType === 'gst' && taxName === 'GST' ? ' (e.g., 27AAPCT1234A1Z0)' : ''}`}
             value={gstNumber}
             onChange={(e) => setGstNumber(e.target.value)}
             sx={{
@@ -1146,6 +1163,7 @@ const SummaryStep = () => {
             }}
           />
         </Box>
+        )}
 
         {/* Terms & Conditions Checkbox */}
         <Box

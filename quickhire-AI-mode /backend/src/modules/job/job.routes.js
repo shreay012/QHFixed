@@ -10,6 +10,24 @@ import { toObjectId } from '../../utils/oid.js';
 import { idempotencyGetOrSet, acquireLock, releaseLock } from '../../utils/idempotency.js';
 import { checkSlotBookable } from '../availability/availability.service.js';
 import { COUNTRIES, LOCALE_TO_COUNTRY } from '../service/service.model.js';
+import { getCountryConfig } from '../../config/country.config.js';
+
+// COUNTRY_TAX_V1: every booking-pricing path used to multiply by 0.18 (IN
+// GST) regardless of the customer's country. Look up the country's actual
+// tax rule (gst/vat/none) and return a structured pricing breakdown.
+function computeTax(subtotal, country) {
+  const cfg = getCountryConfig(country);
+  const taxCfg = cfg?.tax || { type: 'none', rate: 0, name: '', inclusive: false };
+  const rate = Number(taxCfg.rate) || 0;
+  const taxAmount = +(subtotal * rate).toFixed(2);
+  return {
+    rate,
+    taxAmount,
+    taxName: taxCfg.name || '',
+    taxType: taxCfg.type || 'none',
+    inclusive: taxCfg.inclusive === true,
+  };
+}
 
 const r = Router();
 const jobsCol = () => getDb().collection('jobs');
@@ -115,9 +133,23 @@ r.post('/pricing', validate(pricingSchema), asyncHandler(async (req, res) => {
   const svc = await servicesCol().findOne({ _id: toObjectId(serviceIdStr) });
   if (!svc) throw new AppError('RESOURCE_NOT_FOUND', 'Service not found', 404);
   const country = resolveCountry(req);
-  const { hourly, currency } = resolveServicePrice(svc, country);
+  let { hourly, currency } = resolveServicePrice(svc, country);
+
+  // Overlay geo_pricing so the rate matches what the admin set per-country.
+  try {
+    const geo = await getDb().collection('geo_pricing').findOne(
+      { serviceId: svc._id, country },
+      { projection: { basePrice: 1, currency: 1 } },
+    );
+    if (geo?.basePrice > 0) {
+      hourly   = Number(geo.basePrice);
+      currency = geo.currency || currency;
+    }
+  } catch { /* non-fatal */ }
+
   const subtotal = +(hourly * duration * selectedDays).toFixed(2);
-  const tax = +(subtotal * 0.18).toFixed(2);
+  const taxInfo = computeTax(subtotal, country);
+  const tax = taxInfo.taxAmount;
   const total = +(subtotal + tax).toFixed(2);
   res.json({
     success: true,
@@ -129,8 +161,15 @@ r.post('/pricing', validate(pricingSchema), asyncHandler(async (req, res) => {
       tax,
       total,
       currency,
-      // v3-friendly mirror so FE redux can pick from either field
-      pricing: { hourly, subtotal, tax, total, currency },
+      country,
+      // Country-aware tax metadata so the frontend can render the right
+      // label (GST 18% / VAT 5% / MwSt. 19%) and skip the line entirely
+      // when the country has no platform-level tax (e.g. US).
+      taxRate: taxInfo.rate,
+      taxName: taxInfo.taxName,
+      taxType: taxInfo.taxType,
+      taxInclusive: taxInfo.inclusive,
+      pricing: { hourly, subtotal, tax, total, currency, taxRate: taxInfo.rate, taxName: taxInfo.taxName, taxType: taxInfo.taxType },
       services: services || undefined,
     },
   });
@@ -196,10 +235,24 @@ r.post('/', roleGuard(['user', 'admin']), asyncHandler(async (req, res) => {
       }
     }
 
-    const hourly = svc.pricing?.hourly ?? svc.hourlyRate ?? 0;
+    const country = resolveCountry(req);
+    let { hourly, currency } = resolveServicePrice(svc, country);
+    // Overlay geo_pricing for per-country admin-set rate
+    try {
+      const geo = await getDb().collection('geo_pricing').findOne(
+        { serviceId: svc._id, country },
+        { projection: { basePrice: 1, currency: 1 } },
+      );
+      if (geo?.basePrice > 0) {
+        hourly   = Number(geo.basePrice);
+        currency = geo.currency || currency;
+      }
+    } catch { /* non-fatal */ }
+
     const duration = Number(s0.durationTime) || 8;
-    const subtotal = hourly * duration;
-    const tax = +(subtotal * 0.18).toFixed(2);
+    const subtotal = +(hourly * duration).toFixed(2);
+    const taxInfo = computeTax(subtotal, country);
+    const tax = taxInfo.taxAmount;
     const total = +(subtotal + tax).toFixed(2);
     const doc = {
       userId: new ObjectId(req.user.id),
@@ -215,9 +268,20 @@ r.post('/', roleGuard(['user', 'admin']), asyncHandler(async (req, res) => {
       endTime: s0.endTime || null,
       timeSlot: s0.timeSlot || null,
       bookingType: s0.bookingType || 'later',
-      title: svc.name || svc.title || 'Booking',
+      title: flatTitle(svc),
       status: 'pending',
-      pricing: { hourly, subtotal, tax, total, currency: svc.pricing?.currency || 'INR' },
+      country,
+      pricing: {
+        hourly,
+        subtotal,
+        tax,
+        total,
+        currency,
+        taxRate: taxInfo.rate,
+        taxName: taxInfo.taxName,
+        taxType: taxInfo.taxType,
+        taxInclusive: taxInfo.inclusive,
+      },
       logs: [],
       createdAt: now, updatedAt: now,
     };
