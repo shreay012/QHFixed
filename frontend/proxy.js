@@ -88,7 +88,7 @@ export function proxy(request) {
 
   // ── 2. Detect country (priority order) ───────────────────────────────────
 
-  // a) Country path segment (/in/, /ae/, etc.)
+  // a) Country path segment (/in/, /ae/, etc.) — explicit URL override
   const pathSegment = extractCountrySegment(pathname);
   let detectedCountry = pathSegment ? SEGMENT_TO_CODE[pathSegment] : null;
 
@@ -101,31 +101,39 @@ export function proxy(request) {
     }
   }
 
-  // b) Existing cookie (user's explicit choice from the country switcher)
+  // GEO_REDETECT_HOMEPAGE_V1: on the homepage we re-evaluate IP geo on every
+  // request, even if a qh_country cookie is already set. This means a user
+  // who travels (or hits the page from a new region) is always redirected
+  // to the correct market on the next homepage refresh — instead of the
+  // cookie sticking forever.
+  //
+  // Trade-off: if the user *manually* switched country via the picker and
+  // then hits home, they'll be bounced back to their IP-detected country
+  // unless they've also navigated into that country (the path segment
+  // wins). For non-homepage paths, cookie-first ordering is preserved so
+  // the manual choice persists during a session.
+  const isHomepage = pathname === '/' || /^\/(in|ae|de|us|au)\/?$/i.test(pathname);
+
+  // b) Cookie or IP — order depends on whether we're on the homepage
   if (!detectedCountry) {
     const cookieCountry = cookies.get('qh_country')?.value;
-    if (cookieCountry && COUNTRY_SEGMENTS.has(cookieCountry.toLowerCase())) {
+    const geoHeader = headers.get('cf-ipcountry') || headers.get('x-vercel-ip-country');
+    const ipCountry = geoHeader && COUNTRY_SEGMENTS.has(geoHeader.toLowerCase())
+      ? geoHeader.toUpperCase()
+      : null;
+    const cookieValid = cookieCountry && COUNTRY_SEGMENTS.has(cookieCountry.toLowerCase());
+
+    if (isHomepage && ipCountry) {
+      // Homepage: prefer IP geo so refreshes always land on the correct market
+      detectedCountry = ipCountry;
+    } else if (cookieValid) {
       detectedCountry = cookieCountry.toUpperCase();
+    } else if (ipCountry) {
+      detectedCountry = ipCountry;
     }
   }
 
-  // c) Cloudflare / Vercel geo header (IP-based geolocation)
-  //
-  // GEO_DETECT_V2: re-enabled IP detection so non-Indian visitors land on
-  // their country's experience automatically. Only honour the header when
-  // it maps to a market we actually support (IN/AE/DE/US/AU). Anything
-  // else falls through to the IN default below — that matches product:
-  // root domain serves India, every other supported market gets the
-  // /<code>/ prefix via path routing.
-  if (!detectedCountry) {
-    const geoHeader =
-      headers.get('cf-ipcountry') || headers.get('x-vercel-ip-country');
-    if (geoHeader && COUNTRY_SEGMENTS.has(geoHeader.toLowerCase())) {
-      detectedCountry = geoHeader.toUpperCase();
-    }
-  }
-
-  // d) Hard default — India
+  // c) Hard default — India
   if (!detectedCountry) detectedCountry = 'IN';
 
   const region = COUNTRY_REGIONS[detectedCountry] || null;
