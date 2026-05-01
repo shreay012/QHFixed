@@ -133,9 +133,36 @@ r.get('/', asyncHandler(async (req, res) => {
 
   const items = await col().find({ active: { $ne: false } }).toArray();
 
+  // GEO_LIST_OVERLAY_V1: bulk-load every geo_pricing override for the
+  // resolved country in a single query so each card/row carries the right
+  // hourlyRate + currency. Without this, customers in non-IN markets saw
+  // the legacy IN base rate on the homepage / catalog grids — only the
+  // /services/:id detail endpoint was doing the overlay.
+  const ids = items.map((s) => s._id);
+  let geoMap = new Map();
+  if (ids.length > 0) {
+    try {
+      const geoRows = await getDb().collection('geo_pricing')
+        .find({ serviceId: { $in: ids }, country }, { projection: { serviceId: 1, basePrice: 1, currency: 1 } })
+        .toArray();
+      geoMap = new Map(geoRows.map((g) => [String(g.serviceId), g]));
+    } catch { /* geo_pricing read failure must not break the list */ }
+  }
+
   // Project each service for the resolved country/locale — adds activePricing,
-  // supportedCountries, and localised name/description fields.
-  let projected = items.map((s) => projectForCountry(s, country, locale));
+  // supportedCountries, localised name/description fields, and overlays the
+  // per-country hourly rate when an override exists.
+  let projected = items.map((s) => {
+    const out = projectForCountry(s, country, locale);
+    const geo = geoMap.get(String(s._id));
+    if (geo && geo.basePrice > 0) {
+      out.geoPrice    = geo.basePrice;
+      out.geoCurrency = geo.currency;
+      out.pricing     = { ...(out.pricing || {}), hourly: geo.basePrice, currency: geo.currency };
+      out.hourlyRate  = geo.basePrice;
+    }
+    return out;
+  });
 
   // Drop services with no active pricing for this country unless explicitly
   // requested.  Services with legacy flat pricing (no pricing[]) are kept as-is.
