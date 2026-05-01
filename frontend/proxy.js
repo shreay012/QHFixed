@@ -109,15 +109,23 @@ export function proxy(request) {
     }
   }
 
-  // DEFAULT_INDIA_FIX_V1: skip IP-based geolocation entirely. Product wants
-  // every anonymous visitor to land on the India experience by default —
-  // users can still switch via the country picker, which writes the
-  // qh_country cookie that branch (b) above respects on subsequent loads.
-  // Cloudflare/Vercel geo headers were producing inconsistent country
-  // routing (e.g. test users in DE seeing /de/ then breaking on missing
-  // German content); a hard IN default is the simpler, predictable behaviour.
+  // c) Cloudflare / Vercel geo header (IP-based geolocation)
+  //
+  // GEO_DETECT_V2: re-enabled IP detection so non-Indian visitors land on
+  // their country's experience automatically. Only honour the header when
+  // it maps to a market we actually support (IN/AE/DE/US/AU). Anything
+  // else falls through to the IN default below — that matches product:
+  // root domain serves India, every other supported market gets the
+  // /<code>/ prefix via path routing.
+  if (!detectedCountry) {
+    const geoHeader =
+      headers.get('cf-ipcountry') || headers.get('x-vercel-ip-country');
+    if (geoHeader && COUNTRY_SEGMENTS.has(geoHeader.toLowerCase())) {
+      detectedCountry = geoHeader.toUpperCase();
+    }
+  }
 
-  // c) Hard default
+  // d) Hard default — India
   if (!detectedCountry) detectedCountry = 'IN';
 
   const region = COUNTRY_REGIONS[detectedCountry] || null;
@@ -139,15 +147,25 @@ export function proxy(request) {
     if (!CURRENCY_CODES.includes(currency)) currency = DEFAULT_CURRENCY;
   }
 
-  // ── 5. Country path-prefix routing (optional — enable when app/[country]/ is live)
-  // Set NEXT_PUBLIC_COUNTRY_PATH_ROUTING=true in .env.local to activate.
-  // While false: cookies/headers are set but no URL redirect happens.
-  const PATH_ROUTING_ENABLED =
-    process.env.NEXT_PUBLIC_COUNTRY_PATH_ROUTING === 'true';
+  // ── 5. Country path-prefix routing
+  //
+  // Routing rules (per product):
+  //   • India users → root domain `/`, `/about`, `/service-details/...` (no
+  //     prefix). Mirrors the canonical Indian experience.
+  //   • Every other supported market (AE / DE / US / AU) → redirect bare
+  //     paths to `/<code>/...`.
+  //   • If a user is already on a country-prefixed URL, we don't touch it.
+  //   • API routes, error routes are never redirected.
+  //
+  // PATH_ROUTING is always-on now. The old NEXT_PUBLIC_COUNTRY_PATH_ROUTING
+  // gate stays as an emergency kill-switch — set it to "false" to disable.
+  const PATH_ROUTING_DISABLED =
+    process.env.NEXT_PUBLIC_COUNTRY_PATH_ROUTING === 'false';
 
-  if (PATH_ROUTING_ENABLED) {
+  if (!PATH_ROUTING_DISABLED) {
     const shouldPrefix =
       !pathSegment &&
+      detectedCountry !== 'IN' &&            // ← India served at root
       CODE_TO_SEGMENT[detectedCountry] &&
       !pathname.startsWith('/api/') &&
       pathname !== '/404' &&
@@ -165,6 +183,11 @@ export function proxy(request) {
       res.cookies.set('qh_currency', currency, COOKIE_OPTS);
       return res;
     }
+
+    // Inverse case: an Indian visitor lands on a country-prefixed URL
+    // (e.g. they manually typed /ae/) — leave the URL alone but make sure
+    // the cookie still matches the path so subsequent navigation is
+    // consistent. This is handled by step 6 below.
   }
 
   // ── 6. Pass through: set cookies + inject geo headers ────────────────────

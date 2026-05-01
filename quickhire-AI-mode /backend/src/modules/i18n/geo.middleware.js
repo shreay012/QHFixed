@@ -65,18 +65,24 @@ function extractLangFromAcceptLanguage(header = '') {
 export async function geoMiddleware(req, _res, next) {
   try {
     // ── 1. Detect country ──────────────────────────────────────────────
-    // DEFAULT_INDIA_FIX_V1: skip CF-IPCountry IP geolocation. Frontend now
-    // forwards the user's explicit choice via X-Country (cookie-backed) and
-    // every anonymous request defaults to India. Keeping IP detection here
-    // would race with the frontend default and produce inconsistent geo
-    // routing across the SSR / client boundary.
+    // GEO_DETECT_V2: detection chain (highest priority first):
+    //   1. X-Country header / dev _country query  — explicit frontend choice
+    //      forwarded from the qh_country cookie or user profile.
+    //   2. CF-IPCountry header                     — Cloudflare IP geo.
+    //   3. Default: India.
     let country = null;
 
-    // Explicit override from frontend (cookie-based or user profile selection)
     const override = req.header('X-Country') ||
       (process.env.NODE_ENV !== 'production' ? req.query._country : null);
     if (override && /^[A-Z]{2}$/i.test(override)) {
       country = override.toUpperCase();
+    }
+
+    if (!country) {
+      const cfCountry = req.header('CF-IPCountry');
+      if (cfCountry && /^[A-Z]{2}$/i.test(cfCountry) && cfCountry !== 'XX') {
+        country = cfCountry.toUpperCase();
+      }
     }
 
     if (!country || country === 'XX') country = DEFAULT_COUNTRY_CODE;
