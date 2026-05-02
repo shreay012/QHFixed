@@ -122,7 +122,9 @@
     "agreeTerms": "Acepto los términos y condiciones",
     "back": "Atrás",
     "continue": "Continuar",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "servicesShort": "Servicios",
+    "hoursShort": "Horas"
   },
   "servicesStep": {
     "title": "Elige en qué necesitas ayuda",
@@ -147,7 +149,12 @@
     "today": "Hoy",
     "back": "Atrás",
     "continue": "Continuar",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "hoursCount": "{hours} horas",
+    "perHour": "{price}/hora",
+    "extendLaterHelper": "¿No sabes cuántas horas necesitas? Puedes ampliar más tarde si es necesario.",
+    "preferredDayTime": "Selecciona tu día y hora preferidos",
+    "onlyFourDays": "Solo puedes seleccionar 4 días"
   },
   "summaryStep": {
     "title": "Revisa tu selección",
@@ -235,7 +242,21 @@
     "processing": "Procesando...",
     "loginRequired": "Inicio de sesión requerido",
     "loginToBook": "Por favor inicia sesión para completar tu reserva",
-    "resendOtpIn": "Reenviar OTP en {time}"
+    "resendOtpIn": "Reenviar OTP en {time}",
+    "taxNumberOptional": "Número de {taxName} (opcional)",
+    "taxNumberTooltip": "Proporciona los datos de {taxName} para obtener beneficios fiscales",
+    "enterTaxNumber": "Introduce el número de {taxName}",
+    "enterTaxNumberWithExample": "Introduce el número de {taxName} (ej.: {example})",
+    "taxAppliedAtCheckout": "{label} se aplicará en el pago",
+    "noAdditionalTax": "Sin impuesto adicional",
+    "reviewBooking": "Revisa tu reserva",
+    "reviewBookingSubtitle": "Una vez completado el pago, te asignaremos un experto adecuado y comenzaremos.",
+    "bookInstantly": "Reservar al instante",
+    "scheduleLater": "Programar para más tarde",
+    "immediately": "Inmediatamente",
+    "hoursLabel": "{hours} horas",
+    "hoursAndPrice": "{hours} horas / {price}",
+    "loadingJob": "Cargando detalles del trabajo..."
   },
   "pricing": {
     "subtotal": "Subtotal",
@@ -700,24 +721,24 @@
     "ctaPlural": "Encuentra a los Expertos Adecuados"
   },
   "serviceHeader": {
-    "heading": "Get verified experts ready to start in",
-    "headingHighlight": "minutes",
-    "subheading": "Connect with top-tier professionals who can solve your challenges with speed and expertise.",
-    "feature1": "400+ Verified professionals",
-    "feature2": "Enterprise-grade security",
-    "feature3": "Transparent hourly pricing",
-    "feature4": "Dedicated project manager"
+    "heading": "Expertos {service} verificados — listos para empezar en",
+    "headingHighlight": "minutos",
+    "subheading": "Conecta con profesionales de primer nivel capaces de resolver tus desafíos con rapidez y experiencia.",
+    "feature1": "+400 profesionales verificados",
+    "feature2": "Seguridad de nivel empresarial",
+    "feature3": "Precios por hora transparentes",
+    "feature4": "Project manager dedicado"
   },
   "serviceFaq": {
-    "headingPart1": "Frequently",
-    "headingHighlight": "Asked",
-    "headingPart2": "Questions",
-    "q1": "Why should I hire through QuickHire instead of freelancers or traditional hiring?",
-    "a1": "QuickHire offers vetted professionals, instant availability, dedicated project management, and guaranteed quality.",
-    "q2": "Can I extend the work if I need more time?",
-    "a2": "Yes, you can easily extend your engagement. Simply reach out to your dedicated TPM or use your dashboard to request an extension.",
-    "q3": "Can I hire multiple resources at once?",
-    "a3": "Absolutely! QuickHire allows you to scale your team by hiring multiple resources simultaneously."
+    "headingPart1": "Preguntas",
+    "headingHighlight": "frecuentes",
+    "headingPart2": "",
+    "q1": "¿Por qué contratar a través de QuickHire en lugar de freelancers o procesos tradicionales?",
+    "a1": "QuickHire ofrece profesionales verificados, disponibilidad inmediata, gestión dedicada del proyecto y calidad garantizada.",
+    "q2": "¿Puedo ampliar el trabajo si necesito más tiempo?",
+    "a2": "Sí, puedes ampliar fácilmente tu contratación. Contacta a tu TPM dedicado o solicítalo desde tu panel.",
+    "q3": "¿Puedo contratar varios recursos a la vez?",
+    "a3": "¡Por supuesto! QuickHire te permite escalar tu equipo contratando varios recursos al mismo tiempo."
   },
   "resource": {
     "dashboard": {
@@ -728,5 +749,38 @@
       "hoursLogged": "Horas registradas",
       "lifetime": "total"
     }
+  },
+  "bookingCard": {
+    "headingPrefix": "Mira cómo",
+    "brand": "QuickHire",
+    "headingSuffix": "puede ayudarte",
+    "step1Title": "Reserva",
+    "step1Desc": "Elige tu recurso y haz una reserva en minutos.",
+    "step2Title": "Reunión inicial",
+    "step2Desc": "Conecta con el profesional y tu project manager para alinear objetivos y ejecución.",
+    "step3Title": "Empieza el trabajo",
+    "step3Desc": "El experto comienza el trabajo según el plan acordado.",
+    "step4Title": "Recibe actualizaciones",
+    "step4Desc": "Recibe actualizaciones regulares por chat o correo de tu project manager.",
+    "step5Title": "Ampliar o cerrar",
+    "step5Desc": "Añade más horas, continúa con el mismo experto o cierra el proyecto al terminar."
+  },
+  "selectiveCard": {
+    "subhead": "Selecciona la opción adecuada para ti",
+    "heading": "Ingenieros seleccionados para ti",
+    "noTechnologies": "No hay tecnologías disponibles para este servicio",
+    "transparentTitle": "Ejecución transparente",
+    "transparentSubtitle": "Transparencia incorporada en cada etapa de la ejecución.",
+    "workingHours": "Lunes a viernes • 9 AM – 6 PM IST",
+    "whatYouGet": "Qué obtienes",
+    "promise1": "Profesionales verificados asignados a tu tarea",
+    "promise2": "Opción de ampliación de soporte",
+    "promise3": "Precios claros y por adelantado",
+    "promise4": "Entrega según lo programado",
+    "whatsNotIncluded": "Qué no está incluido",
+    "default1": "Licencias de software o herramientas de terceros de pago",
+    "default2": "Soporte fuera de los plazos",
+    "default3": "Trabajo fuera del alcance definido del proyecto",
+    "default4": "Soporte en fines de semana y festivos."
   }
 }

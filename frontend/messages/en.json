@@ -122,7 +122,9 @@
     "agreeTerms": "I agree to the terms and conditions",
     "back": "Back",
     "continue": "Continue",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "servicesShort": "Services",
+    "hoursShort": "Hours"
   },
   "servicesStep": {
     "title": "Choose what you need help with",
@@ -147,7 +149,12 @@
     "today": "Today",
     "back": "Back",
     "continue": "Continue",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "hoursCount": "{hours} Hours",
+    "perHour": "{price}/hour",
+    "extendLaterHelper": "Not sure how many hours you need? You can extend later if required.",
+    "preferredDayTime": "Select your preferred day & time",
+    "onlyFourDays": "You can select only 4 Days"
   },
   "summaryStep": {
     "title": "Review your selection",

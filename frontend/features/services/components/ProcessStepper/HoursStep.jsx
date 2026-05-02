@@ -23,7 +23,7 @@ import RadioButtonCheckedIcon from "@mui/icons-material/RadioButtonChecked";
 import RemoveIcon from "@mui/icons-material/Remove";
 import AddIcon from "@mui/icons-material/Add";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { fetchHoursAvailability } from "@/lib/redux/slices/availabilitySlice/availabilitySlice";
 import {
   updateJob,
@@ -38,6 +38,8 @@ const HoursStep = ({ selectedService: selectedServiceProp, serviceId } = {}) => 
   const searchParams = useSearchParams();
   const router = useRouter();
   const t = useTranslations("hoursStep");
+  // Active next-intl locale → BCP-47 tag for date formatting (weekday labels).
+  const localeBcp = useLocale() || "en-US";
 
   const {
     setHoursBookingData,
@@ -187,7 +189,7 @@ const HoursStep = ({ selectedService: selectedServiceProp, serviceId } = {}) => 
           const isToday = current.getTime() === today.getTime();
           dates.push({
             date: new Date(current),
-            dayLabel: current.toLocaleDateString("en-US", { weekday: "short" }),
+            dayLabel: current.toLocaleDateString(localeBcp, { weekday: "short" }),
             dateNumber: current.getDate(),
             isDisabled: false,
             isToday,
@@ -219,7 +221,7 @@ const HoursStep = ({ selectedService: selectedServiceProp, serviceId } = {}) => 
 
       return {
         date: date,
-        dayLabel: date.toLocaleDateString("en-US", { weekday: "short" }),
+        dayLabel: date.toLocaleDateString(localeBcp, { weekday: "short" }),
         dateNumber: date.getDate(),
         // Disable if: not available OR marked as off OR is weekend
         isDisabled: !apiDate.isAvailable || apiDate.isOff || apiDate.isWeekend,
@@ -229,8 +231,9 @@ const HoursStep = ({ selectedService: selectedServiceProp, serviceId } = {}) => 
     });
   };
 
-  // Memoize allDates to prevent infinite loop in useEffect dependencies
-  const allDates = useMemo(() => getAvailableDates(), [hoursAvailability]);
+  // Memoize allDates to prevent infinite loop in useEffect dependencies.
+  // Includes localeBcp so weekday labels (Mon/Mo./月) re-render on locale switch.
+  const allDates = useMemo(() => getAvailableDates(), [hoursAvailability, localeBcp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check scroll position to enable/disable arrows
   const checkScrollPosition = () => {
@@ -880,27 +883,30 @@ const HoursStep = ({ selectedService: selectedServiceProp, serviceId } = {}) => 
   const planCustom = calcPlan(8, selectedDays);
   const mrpRate = Math.round(hourlyRate * 1.2); // ~20% strikethrough MRP
 
+  // Locale-aware "<rate>/hour" suffix used on every plan card.
+  const perHourLabel = (rate) => t('perHour', { price: fmtINR(rate) });
+
   const pricingPlans = [
     {
       id: "plan-4",
-      hours: "4 Hours",
+      hours: t('hoursCount', { hours: 4 }),
       price: fmtINR(plan4.total),
-      pricePerHour: `${fmtINR(hourlyRate)}/hour`,
-      originalPrice: `${fmtINR(mrpRate)}/hour`,
+      pricePerHour: perHourLabel(hourlyRate),
+      originalPrice: perHourLabel(mrpRate),
     },
     {
       id: "plan-8",
-      hours: "8 Hours",
+      hours: t('hoursCount', { hours: 8 }),
       price: fmtINR(plan8.total),
-      pricePerHour: `${fmtINR(hourlyRate)}/hour`,
-      originalPrice: `${fmtINR(mrpRate)}/hour`,
+      pricePerHour: perHourLabel(hourlyRate),
+      originalPrice: perHourLabel(mrpRate),
     },
     {
       id: "plan-custom",
       hours: selectedDays > 1 ? t('daysWithHours', { days: selectedDays, hours: 8 * selectedDays }) : t('customDuration'),
       price: fmtINR(planCustom.total),
-      pricePerHour: `${fmtINR(hourlyRate)}/hour`,
-      originalPrice: `${fmtINR(mrpRate)}/hour`,
+      pricePerHour: perHourLabel(hourlyRate),
+      originalPrice: perHourLabel(mrpRate),
       popular: true,
       hasInfo: true,
       showDaySelector: true,
@@ -1270,7 +1276,7 @@ const HoursStep = ({ selectedService: selectedServiceProp, serviceId } = {}) => 
           mb: { xs: 3, md: 2 },
         }}
       >
-        Not sure how many hours you need? You can extend later if required.
+        {t('extendLaterHelper')}
       </Typography>
 
       {/* Divider Line */}
@@ -1543,7 +1549,7 @@ const HoursStep = ({ selectedService: selectedServiceProp, serviceId } = {}) => 
                                 lineHeight: "100%",
                               }}
                             >
-                              You can select only 4 Days
+                              {t('onlyFourDays')}
                             </Typography>
                           </Box>
                         )}
@@ -1554,7 +1560,7 @@ const HoursStep = ({ selectedService: selectedServiceProp, serviceId } = {}) => 
                         color: "#9CA3AF",
                       }}
                     >
-                      Select your preferred day & time
+                      {t('preferredDayTime')}
                     </Typography>
                   </Box>
                 </Box>

@@ -122,7 +122,9 @@
     "agreeTerms": "मैं नियमों और शर्तों से सहमत हूँ",
     "back": "वापस",
     "continue": "जारी रखें",
-    "loading": "लोड हो रहा है..."
+    "loading": "लोड हो रहा है...",
+    "servicesShort": "सेवाएँ",
+    "hoursShort": "घंटे"
   },
   "servicesStep": {
     "title": "चुनें कि आपको किसमें मदद चाहिए",
@@ -147,7 +149,12 @@
     "today": "आज",
     "back": "वापस",
     "continue": "जारी रखें",
-    "loading": "लोड हो रहा है..."
+    "loading": "लोड हो रहा है...",
+    "hoursCount": "{hours} घंटे",
+    "perHour": "{price}/घंटा",
+    "extendLaterHelper": "पता नहीं कितने घंटे चाहिए? ज़रूरत पड़ने पर आप बाद में बढ़ा सकते हैं।",
+    "preferredDayTime": "अपनी पसंदीदा तिथि और समय चुनें",
+    "onlyFourDays": "आप केवल 4 दिन चुन सकते हैं"
   },
   "summaryStep": {
     "title": "अपने चयन की समीक्षा करें",
@@ -235,7 +242,21 @@
     "processing": "प्रोसेस हो रहा है...",
     "loginRequired": "लॉगिन आवश्यक है",
     "loginToBook": "अपनी बुकिंग पूरी करने के लिए कृपया लॉगिन करें",
-    "resendOtpIn": "{time} में OTP पुनः भेजें"
+    "resendOtpIn": "{time} में OTP पुनः भेजें",
+    "taxNumberOptional": "{taxName} संख्या (वैकल्पिक)",
+    "taxNumberTooltip": "कर लाभ का दावा करने के लिए {taxName} विवरण प्रदान करें",
+    "enterTaxNumber": "{taxName} संख्या दर्ज करें",
+    "enterTaxNumberWithExample": "{taxName} संख्या दर्ज करें (उदाहरण: {example})",
+    "taxAppliedAtCheckout": "{label} चेकआउट पर लागू होगा",
+    "noAdditionalTax": "कोई अतिरिक्त कर नहीं",
+    "reviewBooking": "अपनी बुकिंग की समीक्षा करें",
+    "reviewBookingSubtitle": "भुगतान पूरा होने के बाद, हम आपको एक उपयुक्त विशेषज्ञ से जोड़ेंगे और शुरू करेंगे।",
+    "bookInstantly": "तुरंत बुक करें",
+    "scheduleLater": "बाद के लिए शेड्यूल करें",
+    "immediately": "तुरंत",
+    "hoursLabel": "{hours} घंटे",
+    "hoursAndPrice": "{hours} घंटे / {price}",
+    "loadingJob": "कार्य विवरण लोड हो रहा है..."
   },
   "pricing": {
     "subtotal": "उप-योग",
@@ -700,24 +721,24 @@
     "ctaPlural": "सही विशेषज्ञ खोजें"
   },
   "serviceHeader": {
-    "heading": "Get verified experts ready to start in",
-    "headingHighlight": "minutes",
-    "subheading": "Connect with top-tier professionals who can solve your challenges with speed and expertise.",
-    "feature1": "400+ Verified professionals",
-    "feature2": "Enterprise-grade security",
-    "feature3": "Transparent hourly pricing",
-    "feature4": "Dedicated project manager"
+    "heading": "सत्यापित {service} विशेषज्ञ — शुरू करने के लिए तैयार",
+    "headingHighlight": "मिनटों में",
+    "subheading": "शीर्ष-स्तरीय पेशेवरों से जुड़ें जो आपकी चुनौतियों को तेज़ी और विशेषज्ञता से हल कर सकते हैं।",
+    "feature1": "400+ सत्यापित पेशेवर",
+    "feature2": "एंटरप्राइज़-ग्रेड सुरक्षा",
+    "feature3": "पारदर्शी प्रति घंटा मूल्य निर्धारण",
+    "feature4": "समर्पित प्रोजेक्ट मैनेजर"
   },
   "serviceFaq": {
-    "headingPart1": "Frequently",
-    "headingHighlight": "Asked",
-    "headingPart2": "Questions",
-    "q1": "Why should I hire through QuickHire instead of freelancers or traditional hiring?",
-    "a1": "QuickHire offers vetted professionals, instant availability, dedicated project management, and guaranteed quality.",
-    "q2": "Can I extend the work if I need more time?",
-    "a2": "Yes, you can easily extend your engagement. Simply reach out to your dedicated TPM or use your dashboard to request an extension.",
-    "q3": "Can I hire multiple resources at once?",
-    "a3": "Absolutely! QuickHire allows you to scale your team by hiring multiple resources simultaneously."
+    "headingPart1": "अक्सर",
+    "headingHighlight": "पूछे",
+    "headingPart2": "जाने वाले प्रश्न",
+    "q1": "मुझे फ्रीलांसरों या पारंपरिक भर्ती के बजाय QuickHire के माध्यम से क्यों भर्ती करना चाहिए?",
+    "a1": "QuickHire परीक्षित पेशेवर, तत्काल उपलब्धता, समर्पित प्रोजेक्ट प्रबंधन और गारंटीशुदा गुणवत्ता प्रदान करता है।",
+    "q2": "अगर मुझे अधिक समय चाहिए तो क्या मैं काम बढ़ा सकता हूँ?",
+    "a2": "हाँ, आप आसानी से अपनी सेवा अवधि बढ़ा सकते हैं। बस अपने समर्पित TPM से संपर्क करें या डैशबोर्ड का उपयोग करें।",
+    "q3": "क्या मैं एक साथ कई संसाधन भर्ती कर सकता हूँ?",
+    "a3": "बिल्कुल! QuickHire आपको एक साथ कई संसाधनों को नियुक्त करके अपनी टीम बढ़ाने की सुविधा देता है।"
   },
   "resource": {
     "dashboard": {
@@ -728,5 +749,38 @@
       "hoursLogged": "लॉग किए गए घंटे",
       "lifetime": "कुल"
     }
+  },
+  "bookingCard": {
+    "headingPrefix": "देखें कैसे",
+    "brand": "QuickHire",
+    "headingSuffix": "आपकी मदद कर सकता है",
+    "step1Title": "बुकिंग",
+    "step1Desc": "अपना संसाधन चुनें और मिनटों में बुकिंग करें।",
+    "step2Title": "किक-ऑफ कॉल",
+    "step2Desc": "लक्ष्यों और निष्पादन पर सहमत होने के लिए विशेषज्ञ और प्रोजेक्ट मैनेजर से जुड़ें।",
+    "step3Title": "काम शुरू",
+    "step3Desc": "विशेषज्ञ सहमत योजना के आधार पर काम शुरू करते हैं।",
+    "step4Title": "अपडेट प्राप्त करें",
+    "step4Desc": "अपने प्रोजेक्ट मैनेजर से चैट या ईमेल के माध्यम से नियमित अपडेट प्राप्त करें।",
+    "step5Title": "विस्तार करें या बंद करें",
+    "step5Desc": "अधिक घंटे जोड़ें, उसी विशेषज्ञ के साथ जारी रखें, या प्रोजेक्ट पूरा होने पर बंद करें।"
+  },
+  "selectiveCard": {
+    "subhead": "अपने लिए सही विकल्प चुनें",
+    "heading": "आपके लिए चुने गए इंजीनियर",
+    "noTechnologies": "इस सेवा के लिए कोई तकनीक उपलब्ध नहीं है",
+    "transparentTitle": "पारदर्शी निष्पादन",
+    "transparentSubtitle": "निष्पादन के हर चरण में पारदर्शिता।",
+    "workingHours": "सोमवार–शुक्रवार • 9 AM – 6 PM IST",
+    "whatYouGet": "आपको क्या मिलेगा",
+    "promise1": "आपके कार्य के लिए सत्यापित पेशेवर",
+    "promise2": "सहायता विस्तार विकल्प",
+    "promise3": "पारदर्शी, अग्रिम मूल्य निर्धारण",
+    "promise4": "निर्धारित समय पर डिलीवरी",
+    "whatsNotIncluded": "क्या शामिल नहीं है",
+    "default1": "सॉफ़्टवेयर लाइसेंस या सशुल्क तृतीय-पक्ष टूल",
+    "default2": "समय सीमा से परे समर्थन",
+    "default3": "परिभाषित प्रोजेक्ट दायरे से परे काम",
+    "default4": "सप्ताहांत और राष्ट्रीय अवकाश समर्थन।"
   }
 }

@@ -122,7 +122,9 @@
     "agreeTerms": "أوافق على الشروط والأحكام",
     "back": "رجوع",
     "continue": "متابعة",
-    "loading": "جاري التحميل..."
+    "loading": "جاري التحميل...",
+    "servicesShort": "الخدمات",
+    "hoursShort": "الساعات"
   },
   "servicesStep": {
     "title": "اختر ما تحتاج المساعدة فيه",
@@ -147,7 +149,12 @@
     "today": "اليوم",
     "back": "رجوع",
     "continue": "متابعة",
-    "loading": "جاري التحميل..."
+    "loading": "جاري التحميل...",
+    "hoursCount": "{hours} ساعات",
+    "perHour": "{price}/ساعة",
+    "extendLaterHelper": "لست متأكدًا من عدد الساعات التي تحتاجها؟ يمكنك التمديد لاحقًا إذا لزم الأمر.",
+    "preferredDayTime": "اختر اليوم والوقت المفضلين لديك",
+    "onlyFourDays": "يمكنك اختيار 4 أيام فقط"
   },
   "summaryStep": {
     "title": "راجع اختيارك",
@@ -235,7 +242,21 @@
     "processing": "جاري المعالجة...",
     "loginRequired": "تسجيل الدخول مطلوب",
     "loginToBook": "يرجى تسجيل الدخول لإكمال حجزك",
-    "resendOtpIn": "إعادة إرسال OTP خلال {time}"
+    "resendOtpIn": "إعادة إرسال OTP خلال {time}",
+    "taxNumberOptional": "رقم {taxName} (اختياري)",
+    "taxNumberTooltip": "قدّم تفاصيل {taxName} للحصول على المزايا الضريبية",
+    "enterTaxNumber": "أدخل رقم {taxName}",
+    "enterTaxNumberWithExample": "أدخل رقم {taxName} (مثال: {example})",
+    "taxAppliedAtCheckout": "سيتم تطبيق {label} عند الدفع",
+    "noAdditionalTax": "لا توجد ضريبة إضافية",
+    "reviewBooking": "راجع حجزك",
+    "reviewBookingSubtitle": "بمجرد إتمام الدفع، سنطابقك مع خبير مناسب ونبدأ.",
+    "bookInstantly": "احجز فورًا",
+    "scheduleLater": "جدولة لاحقًا",
+    "immediately": "فورًا",
+    "hoursLabel": "{hours} ساعات",
+    "hoursAndPrice": "{hours} ساعات / {price}",
+    "loadingJob": "جارٍ تحميل تفاصيل المهمة..."
   },
   "pricing": {
     "subtotal": "الإجمالي الفرعي",
@@ -700,24 +721,24 @@
     "ctaPlural": "ابحث عن الخبراء المناسبين"
   },
   "serviceHeader": {
-    "heading": "Get verified experts ready to start in",
-    "headingHighlight": "minutes",
-    "subheading": "Connect with top-tier professionals who can solve your challenges with speed and expertise.",
-    "feature1": "400+ Verified professionals",
-    "feature2": "Enterprise-grade security",
-    "feature3": "Transparent hourly pricing",
-    "feature4": "Dedicated project manager"
+    "heading": "خبراء {service} موثقون — جاهزون للبدء خلال",
+    "headingHighlight": "دقائق",
+    "subheading": "تواصل مع محترفين من الطراز الأول قادرين على حل تحدياتك بسرعة وكفاءة.",
+    "feature1": "+400 محترف موثق",
+    "feature2": "أمان على مستوى المؤسسات",
+    "feature3": "تسعير شفاف بالساعة",
+    "feature4": "مدير مشروع مخصص"
   },
   "serviceFaq": {
-    "headingPart1": "Frequently",
-    "headingHighlight": "Asked",
-    "headingPart2": "Questions",
-    "q1": "Why should I hire through QuickHire instead of freelancers or traditional hiring?",
-    "a1": "QuickHire offers vetted professionals, instant availability, dedicated project management, and guaranteed quality.",
-    "q2": "Can I extend the work if I need more time?",
-    "a2": "Yes, you can easily extend your engagement. Simply reach out to your dedicated TPM or use your dashboard to request an extension.",
-    "q3": "Can I hire multiple resources at once?",
-    "a3": "Absolutely! QuickHire allows you to scale your team by hiring multiple resources simultaneously."
+    "headingPart1": "الأسئلة",
+    "headingHighlight": "الشائعة",
+    "headingPart2": "",
+    "q1": "لماذا أوظف عبر QuickHire بدلاً من المستقلين أو التوظيف التقليدي؟",
+    "a1": "يقدم QuickHire محترفين مفحوصين، توافرًا فوريًا، إدارة مشاريع مخصصة، وجودة مضمونة.",
+    "q2": "هل يمكنني تمديد العمل إذا احتجت إلى مزيد من الوقت؟",
+    "a2": "نعم، يمكنك بسهولة تمديد التزامك. تواصل مع TPM المخصص لك أو استخدم لوحة التحكم.",
+    "q3": "هل يمكنني توظيف عدة موارد في وقت واحد؟",
+    "a3": "بالتأكيد! يتيح لك QuickHire توسيع فريقك من خلال توظيف عدة موارد في وقت واحد."
   },
   "resource": {
     "dashboard": {
@@ -728,5 +749,38 @@
       "hoursLogged": "الساعات المسجلة",
       "lifetime": "مدى الحياة"
     }
+  },
+  "bookingCard": {
+    "headingPrefix": "كيف يمكن لـ",
+    "brand": "QuickHire",
+    "headingSuffix": "مساعدتك",
+    "step1Title": "الحجز",
+    "step1Desc": "اختر موردك وقم بالحجز في دقائق.",
+    "step2Title": "اجتماع البدء",
+    "step2Desc": "تواصل مع المحترف ومدير المشروع للاتفاق على الأهداف والتنفيذ.",
+    "step3Title": "بدء العمل",
+    "step3Desc": "يبدأ الخبير العمل وفقًا للخطة المتفق عليها.",
+    "step4Title": "احصل على التحديثات",
+    "step4Desc": "تلقَّ تحديثات منتظمة عبر الدردشة أو البريد الإلكتروني من مدير المشروع.",
+    "step5Title": "تمديد أو إغلاق",
+    "step5Desc": "أضف ساعات أخرى، تابع مع نفس الخبير، أو أغلق المشروع عند الانتهاء."
+  },
+  "selectiveCard": {
+    "subhead": "اختر الخيار المناسب لك",
+    "heading": "مهندسون منتقون لك",
+    "noTechnologies": "لا توجد تقنيات متاحة لهذه الخدمة",
+    "transparentTitle": "تنفيذ شفاف",
+    "transparentSubtitle": "الشفافية مدمجة في كل مرحلة من مراحل التنفيذ.",
+    "workingHours": "الإثنين–الجمعة • 9 صباحًا – 6 مساءً (IST)",
+    "whatYouGet": "ما الذي تحصل عليه",
+    "promise1": "محترفون موثقون مخصصون لمهمتك",
+    "promise2": "خيار تمديد الدعم",
+    "promise3": "تسعير شفاف وواضح",
+    "promise4": "تسليم وفقًا للجدول الزمني",
+    "whatsNotIncluded": "ما هو غير مشمول",
+    "default1": "تراخيص البرامج أو الأدوات المدفوعة من الأطراف الثالثة",
+    "default2": "الدعم خارج المواعيد المحددة",
+    "default3": "العمل خارج نطاق المشروع المحدد",
+    "default4": "دعم عطلات نهاية الأسبوع والعطلات الرسمية."
   }
 }

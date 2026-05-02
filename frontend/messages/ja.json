@@ -122,7 +122,9 @@
     "agreeTerms": "利用規約に同意します",
     "back": "戻る",
     "continue": "続ける",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "servicesShort": "サービス",
+    "hoursShort": "時間"
   },
   "servicesStep": {
     "title": "サポートが必要なものを選択してください",
@@ -147,7 +149,12 @@
     "today": "今日",
     "back": "戻る",
     "continue": "続ける",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "hoursCount": "{hours}時間",
+    "perHour": "{price}/時間",
+    "extendLaterHelper": "必要な時間がはっきりしなくても、後から必要に応じて延長できます。",
+    "preferredDayTime": "ご希望の日時を選択してください",
+    "onlyFourDays": "4日間までしか選択できません"
   },
   "summaryStep": {
     "title": "選択を確認してください",
@@ -235,7 +242,21 @@
     "processing": "処理中...",
     "loginRequired": "ログインが必要です",
     "loginToBook": "予約を完了するためにログインしてください",
-    "resendOtpIn": "{time} 後にOTPを再送信"
+    "resendOtpIn": "{time} 後にOTPを再送信",
+    "taxNumberOptional": "{taxName} 番号（任意）",
+    "taxNumberTooltip": "{taxName} の詳細を入力すると税制上の特典を受けられます",
+    "enterTaxNumber": "{taxName} 番号を入力",
+    "enterTaxNumberWithExample": "{taxName} 番号を入力（例: {example}）",
+    "taxAppliedAtCheckout": "{label} はチェックアウト時に加算されます",
+    "noAdditionalTax": "追加の税金はありません",
+    "reviewBooking": "予約内容を確認",
+    "reviewBookingSubtitle": "お支払いが完了次第、適切なエキスパートをマッチングして開始します。",
+    "bookInstantly": "すぐに予約",
+    "scheduleLater": "後で予約",
+    "immediately": "すぐに",
+    "hoursLabel": "{hours}時間",
+    "hoursAndPrice": "{hours}時間 / {price}",
+    "loadingJob": "ジョブ詳細を読み込み中..."
   },
   "pricing": {
     "subtotal": "小計",
@@ -700,24 +721,24 @@
     "ctaPlural": "適切なエキスパートを見つける"
   },
   "serviceHeader": {
-    "heading": "Get verified experts ready to start in",
-    "headingHighlight": "minutes",
-    "subheading": "Connect with top-tier professionals who can solve your challenges with speed and expertise.",
-    "feature1": "400+ Verified professionals",
-    "feature2": "Enterprise-grade security",
-    "feature3": "Transparent hourly pricing",
-    "feature4": "Dedicated project manager"
+    "heading": "{service} の認定エキスパート — 開始可能まで",
+    "headingHighlight": "数分",
+    "subheading": "一流のプロフェッショナルとつながり、課題を迅速かつ的確に解決できます。",
+    "feature1": "400+ の認定プロフェッショナル",
+    "feature2": "エンタープライズ級のセキュリティ",
+    "feature3": "透明な時間単価",
+    "feature4": "専任プロジェクトマネージャー"
   },
   "serviceFaq": {
-    "headingPart1": "Frequently",
-    "headingHighlight": "Asked",
-    "headingPart2": "Questions",
-    "q1": "Why should I hire through QuickHire instead of freelancers or traditional hiring?",
-    "a1": "QuickHire offers vetted professionals, instant availability, dedicated project management, and guaranteed quality.",
-    "q2": "Can I extend the work if I need more time?",
-    "a2": "Yes, you can easily extend your engagement. Simply reach out to your dedicated TPM or use your dashboard to request an extension.",
-    "q3": "Can I hire multiple resources at once?",
-    "a3": "Absolutely! QuickHire allows you to scale your team by hiring multiple resources simultaneously."
+    "headingPart1": "よくある",
+    "headingHighlight": "ご質問",
+    "headingPart2": "",
+    "q1": "フリーランスや従来の採用ではなく、QuickHire で雇うべき理由は？",
+    "a1": "QuickHire は事前審査済みのプロ、即時の対応、専任のプロジェクト管理、品質保証を提供します。",
+    "q2": "もっと時間が必要な場合、作業を延長できますか？",
+    "a2": "はい、簡単に延長できます。専任 TPM に連絡するか、ダッシュボードから申請してください。",
+    "q3": "複数のリソースを同時に雇えますか？",
+    "a3": "もちろんです。QuickHire では複数のリソースを同時に雇い、チームを拡張できます。"
   },
   "resource": {
     "dashboard": {
@@ -728,5 +749,38 @@
       "hoursLogged": "記録時間",
       "lifetime": "累計"
     }
+  },
+  "bookingCard": {
+    "headingPrefix": "",
+    "brand": "QuickHire",
+    "headingSuffix": "がどのようにお役に立てるかご紹介します",
+    "step1Title": "予約",
+    "step1Desc": "リソースを選択し、数分で予約を完了します。",
+    "step2Title": "キックオフ・コール",
+    "step2Desc": "プロフェッショナルとプロジェクトマネージャーで目標と進め方を確認します。",
+    "step3Title": "作業開始",
+    "step3Desc": "エキスパートが合意したプランに沿って作業を開始します。",
+    "step4Title": "進捗の受け取り",
+    "step4Desc": "プロジェクトマネージャーからチャットまたはメールで定期的に進捗が届きます。",
+    "step5Title": "延長またはクローズ",
+    "step5Desc": "時間を追加するか、同じエキスパートと続けるか、完了時にプロジェクトを終了します。"
+  },
+  "selectiveCard": {
+    "subhead": "ぴったりのプランを選びましょう",
+    "heading": "あなたのために選ばれたエンジニア",
+    "noTechnologies": "このサービスで利用可能な技術はありません",
+    "transparentTitle": "透明な実行",
+    "transparentSubtitle": "実行のあらゆる段階に組み込まれた透明性。",
+    "workingHours": "月〜金 • 9:00–18:00 (IST)",
+    "whatYouGet": "得られるもの",
+    "promise1": "タスクに割り当てられる認定プロフェッショナル",
+    "promise2": "サポートの延長オプション",
+    "promise3": "明確で前もって示される料金",
+    "promise4": "スケジュール通りの納品",
+    "whatsNotIncluded": "含まれないもの",
+    "default1": "ソフトウェアライセンスや有料の第三者ツール",
+    "default2": "所定スケジュール外のサポート",
+    "default3": "定義された範囲を超える作業",
+    "default4": "週末・祝日のサポート。"
   }
 }

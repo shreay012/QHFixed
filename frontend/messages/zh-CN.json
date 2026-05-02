@@ -122,7 +122,9 @@
     "agreeTerms": "我同意条款和条件",
     "back": "返回",
     "continue": "继续",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "servicesShort": "服务",
+    "hoursShort": "小时"
   },
   "servicesStep": {
     "title": "选择您需要帮助的内容",
@@ -147,7 +149,12 @@
     "today": "今天",
     "back": "返回",
     "continue": "继续",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "hoursCount": "{hours} 小时",
+    "perHour": "{price}/小时",
+    "extendLaterHelper": "不确定需要多少小时？如有需要，您可以稍后延长。",
+    "preferredDayTime": "请选择您方便的日期和时间",
+    "onlyFourDays": "您最多只能选择 4 天"
   },
   "summaryStep": {
     "title": "查看您的选择",
@@ -235,7 +242,21 @@
     "processing": "正在处理...",
     "loginRequired": "需要登录",
     "loginToBook": "请登录以完成您的预订",
-    "resendOtpIn": "{time} 后重新发送 OTP"
+    "resendOtpIn": "{time} 后重新发送 OTP",
+    "taxNumberOptional": "{taxName} 号码（可选）",
+    "taxNumberTooltip": "提供 {taxName} 信息以享受税收优惠",
+    "enterTaxNumber": "请输入 {taxName} 号码",
+    "enterTaxNumberWithExample": "请输入 {taxName} 号码（例如：{example}）",
+    "taxAppliedAtCheckout": "{label} 将在结账时加收",
+    "noAdditionalTax": "无额外税费",
+    "reviewBooking": "查看您的预订",
+    "reviewBookingSubtitle": "付款完成后，我们将为您匹配合适的专家并开始工作。",
+    "bookInstantly": "即时预订",
+    "scheduleLater": "稍后安排",
+    "immediately": "立即",
+    "hoursLabel": "{hours} 小时",
+    "hoursAndPrice": "{hours} 小时 / {price}",
+    "loadingJob": "正在加载工作详情..."
   },
   "pricing": {
     "subtotal": "小计",
@@ -700,24 +721,24 @@
     "ctaPlural": "寻找合适的专家"
   },
   "serviceHeader": {
-    "heading": "Get verified experts ready to start in",
-    "headingHighlight": "minutes",
-    "subheading": "Connect with top-tier professionals who can solve your challenges with speed and expertise.",
-    "feature1": "400+ Verified professionals",
-    "feature2": "Enterprise-grade security",
-    "feature3": "Transparent hourly pricing",
-    "feature4": "Dedicated project manager"
+    "heading": "已验证的 {service} 专家 — 准备在",
+    "headingHighlight": "几分钟内开始",
+    "subheading": "对接顶尖专业人士，快速高效地解决您的问题。",
+    "feature1": "400+ 已验证的专业人才",
+    "feature2": "企业级安全",
+    "feature3": "透明的小时计费",
+    "feature4": "专属项目经理"
   },
   "serviceFaq": {
-    "headingPart1": "Frequently",
-    "headingHighlight": "Asked",
-    "headingPart2": "Questions",
-    "q1": "Why should I hire through QuickHire instead of freelancers or traditional hiring?",
-    "a1": "QuickHire offers vetted professionals, instant availability, dedicated project management, and guaranteed quality.",
-    "q2": "Can I extend the work if I need more time?",
-    "a2": "Yes, you can easily extend your engagement. Simply reach out to your dedicated TPM or use your dashboard to request an extension.",
-    "q3": "Can I hire multiple resources at once?",
-    "a3": "Absolutely! QuickHire allows you to scale your team by hiring multiple resources simultaneously."
+    "headingPart1": "常见",
+    "headingHighlight": "问题",
+    "headingPart2": "",
+    "q1": "为什么选择 QuickHire 而不是自由职业者或传统招聘？",
+    "a1": "QuickHire 提供经过审核的专业人才、即时可用、专属项目管理和质量保证。",
+    "q2": "如果需要更多时间，可以延长服务吗？",
+    "a2": "可以，您可以轻松延长。联系您的专属 TPM 或在仪表盘中申请。",
+    "q3": "可以同时雇用多名资源吗？",
+    "a3": "当然！QuickHire 允许您同时雇用多名资源，扩展团队规模。"
   },
   "resource": {
     "dashboard": {
@@ -728,5 +749,38 @@
       "hoursLogged": "记录小时数",
       "lifetime": "累计"
     }
+  },
+  "bookingCard": {
+    "headingPrefix": "看看",
+    "brand": "QuickHire",
+    "headingSuffix": "如何帮助您",
+    "step1Title": "预订",
+    "step1Desc": "选择您的资源，几分钟内完成预订。",
+    "step2Title": "启动会议",
+    "step2Desc": "与专业人员和项目经理沟通，统一目标和执行计划。",
+    "step3Title": "开始工作",
+    "step3Desc": "专家按照约定的计划开始工作。",
+    "step4Title": "获取更新",
+    "step4Desc": "通过聊天或邮件从项目经理处定期获得进度更新。",
+    "step5Title": "延长或结束",
+    "step5Desc": "增加时间、继续与同一专家合作，或在项目完成时结束。"
+  },
+  "selectiveCard": {
+    "subhead": "选择最适合您的方案",
+    "heading": "为您精选的工程师",
+    "noTechnologies": "此服务暂无可用技术",
+    "transparentTitle": "透明执行",
+    "transparentSubtitle": "在每个执行阶段都内置透明度。",
+    "workingHours": "周一至周五 • 上午 9 点 – 下午 6 点 (IST)",
+    "whatYouGet": "您将获得",
+    "promise1": "为您的任务分配经过验证的专业人员",
+    "promise2": "支持延长选项",
+    "promise3": "透明、提前公开的价格",
+    "promise4": "按计划交付",
+    "whatsNotIncluded": "不包含的内容",
+    "default1": "软件许可或付费的第三方工具",
+    "default2": "超出约定时间的支持",
+    "default3": "超出既定项目范围的工作",
+    "default4": "周末及法定节假日支持。"
   }
 }

@@ -10,6 +10,7 @@ import {
   stepConnectorClasses,
   styled,
 } from "@mui/material";
+import { useTranslations } from "next-intl";
 import { useStepperContext } from "./StepperContext";
 
 // Custom connector with gray line and gap
@@ -71,9 +72,10 @@ const CustomStepIcon = (props) => {
 
 const ProcessStepper = () => {
   const { activeStep, isAuthenticated } = useStepperContext();
+  const t = useTranslations("stepper");
   const steps = isAuthenticated
-    ? ["Services", "Hours", "Summary", "Payment"]
-    : ["Services", "Hours", "Summary", "Details", "Payment"];
+    ? [t("servicesShort"), t("hoursShort"), t("summary"), t("payment")]
+    : [t("servicesShort"), t("hoursShort"), t("summary"), t("details"), t("payment")];
 
   return (
     <Box

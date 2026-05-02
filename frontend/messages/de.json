@@ -122,7 +122,9 @@
     "agreeTerms": "Ich stimme den Allgemeinen Geschäftsbedingungen zu",
     "back": "Zurück",
     "continue": "Weiter",
-    "loading": "Wird geladen..."
+    "loading": "Wird geladen...",
+    "servicesShort": "Leistungen",
+    "hoursShort": "Stunden"
   },
   "servicesStep": {
     "title": "Wählen Sie, wobei Sie Hilfe benötigen",
@@ -147,7 +149,12 @@
     "today": "Heute",
     "back": "Zurück",
     "continue": "Weiter",
-    "loading": "Wird geladen..."
+    "loading": "Wird geladen...",
+    "hoursCount": "{hours} Std.",
+    "perHour": "{price}/Std.",
+    "extendLaterHelper": "Nicht sicher, wie viele Stunden Sie brauchen? Sie können später bei Bedarf verlängern.",
+    "preferredDayTime": "Wählen Sie bevorzugten Tag & Uhrzeit",
+    "onlyFourDays": "Sie können nur 4 Tage auswählen"
   },
   "summaryStep": {
     "title": "Überprüfen Sie Ihre Auswahl",
