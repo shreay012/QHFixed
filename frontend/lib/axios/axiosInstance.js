@@ -168,12 +168,19 @@ axiosInstance.interceptors.response.use(
         }
       }
 
-      // Refresh failed or no refresh token → redirect protected pages
+      // Refresh failed or no refresh token. If the user *thought* they were
+      // authenticated (has a non-guest token in localStorage), the token is
+      // now stale — clear it and bounce them to /login so they can re-auth.
+      // This must run even on PUBLIC_PREFIXES pages (e.g. /book-your-resource,
+      // /service-details) because those pages still trigger authenticated
+      // calls like /payments/create-order, and silently surfacing a 401 just
+      // shows a generic "failed" toast with no way to recover.
       const rawPath = window.location.pathname || '/';
       const path = stripCountry(rawPath);
+      const hadAuthToken = !!window.localStorage.getItem('token');
       const isPublic =
         path === '/' || PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p + '/'));
-      if (!isPublic) {
+      if (hadAuthToken || !isPublic) {
         clearAuthStorage();
         window.location.replace(`/login?next=${encodeURIComponent(rawPath)}`);
       }
