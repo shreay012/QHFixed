@@ -25,6 +25,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { useCmsTranslate } from "@/lib/i18n/useCmsTranslate";
 import { fetchDashboardStats } from "@/lib/redux/slices/dashboardSlice";
 import { addToCart } from "@/lib/redux/slices/cartSlice/cartSlice";
+import { selectTaxInfo } from "@/lib/redux/slices/regionSlice/regionSlice";
 
 const SummaryStep = () => {
   const topRef = useRef(null);
@@ -270,17 +271,30 @@ const SummaryStep = () => {
   const _tp = pricingData?.data?.totalPricing || {};
   const subtotal = _tp.basePrice ?? _tp.subtotal ?? 0;
   const gstAmount = _tp.gstAmount ?? _tp.tax ?? 0;
-  const total = _tp.totalPriceWithGst ?? _tp.total ?? subtotal + gstAmount;
   const discountAmount = _tp.discountAmount ?? 0;
 
-  // COUNTRY_TAX_DISPLAY_V1: tax line is country-aware. Backend now ships
-  // taxName ("GST", "VAT", "MwSt.") and taxRate (0.18, 0.05, 0.19, …).
-  // When the country has no platform-level tax (US: type='none', rate=0),
-  // skip the line entirely so the summary doesn't show "GST 0%".
-  const taxName     = _tp.taxName ?? 'GST';
-  const taxRate     = typeof _tp.taxRate === 'number' ? _tp.taxRate : 0.18;
-  const taxType     = _tp.taxType ?? 'gst';
-  const showTaxLine = gstAmount > 0 && taxRate > 0 && taxType !== 'none';
+  // COUNTRY_TAX_DISPLAY_V2: tax line is country-aware. Backend ships
+  // taxName ("GST", "VAT", "MwSt.") and taxRate (0.18, 0.05, 0.19, …) when
+  // it correctly resolves the user's country from cookies/headers. If the
+  // backend response doesn't include those fields (or returns IN-defaults
+  // because the country header didn't reach it), fall back to the frontend's
+  // own region selector so a user on /de/ never sees "GST 18%" — they see
+  // "MwSt. 19%" computed against their selected country instead.
+  const region    = useSelector(selectTaxInfo);
+  const backendHasTax = typeof _tp.taxRate === 'number' && Boolean(_tp.taxName);
+  const taxRate   = backendHasTax ? _tp.taxRate : (region?.taxRate ?? 0);
+  const taxName   = backendHasTax ? _tp.taxName : (region?.taxLabel || 'Tax');
+  const taxType   = _tp.taxType ?? (taxRate > 0 ? 'tax' : 'none');
+  // If the backend's tax rate doesn't match the user's country (e.g. backend
+  // didn't see the country header), recompute the tax amount client-side
+  // using the country-correct rate so the displayed line matches its label.
+  const taxAmount = backendHasTax
+    ? gstAmount
+    : +(Number(subtotal) * Number(taxRate)).toFixed(2);
+  const total     = backendHasTax
+    ? (_tp.totalPriceWithGst ?? _tp.total ?? subtotal + gstAmount)
+    : +(Number(subtotal) + taxAmount).toFixed(2);
+  const showTaxLine = taxAmount > 0 && taxRate > 0 && taxType !== 'none';
   const taxLabel    = `${taxName}${taxRate > 0 ? ` (${(taxRate * 100).toFixed(0)}%)` : ''}`;
 
   // Handle Continue - Check login and open Razorpay for logged-in users
@@ -768,7 +782,7 @@ const SummaryStep = () => {
                       {tPay('hoursTotalCost')}
                     </Typography>
                     <Tooltip
-                      title={showTaxLine ? `${taxLabel} will be applied at checkout` : 'No additional tax'}
+                      title={showTaxLine ? tPay('taxAppliedAtCheckout', { label: taxLabel }) : tPay('noAdditionalTax')}
                       arrow
                       placement="bottom"
                       componentsProps={{
@@ -1054,7 +1068,7 @@ const SummaryStep = () => {
                   color: "#6B7280",
                 }}
               >
-                {fmtMoney(gstAmount, { maxDigits: 2 })}
+                {fmtMoney(taxAmount, { maxDigits: 2 })}
               </Typography>
             </Box>
           )}
@@ -1108,10 +1122,10 @@ const SummaryStep = () => {
                 color: "#1F2937",
               }}
             >
-              {taxName} Number (Optional)
+              {tPay('taxNumberOptional', { taxName })}
             </Typography>
             <Tooltip
-              title="Provide GST details to claim tax benefits"
+              title={tPay('taxNumberTooltip', { taxName })}
               arrow
               placement="bottom"
               componentsProps={{
@@ -1141,7 +1155,9 @@ const SummaryStep = () => {
           </Box>
           <TextField
             fullWidth
-            placeholder={`Enter ${taxName} Number${taxType === 'gst' && taxName === 'GST' ? ' (e.g., 27AAPCT1234A1Z0)' : ''}`}
+            placeholder={taxType === 'gst' && taxName === 'GST'
+              ? tPay('enterTaxNumberWithExample', { taxName, example: '27AAPCT1234A1Z0' })
+              : tPay('enterTaxNumber', { taxName })}
             value={gstNumber}
             onChange={(e) => setGstNumber(e.target.value)}
             sx={{

@@ -53,7 +53,7 @@ export const COUNTRY_REGIONS = {
   // UK
   GB: { currency: "GBP", locale: "en", taxRate: 0.20, taxLabel: "VAT" },
   // EU (representative)
-  DE: { currency: "EUR", locale: "de", taxRate: 0.19, taxLabel: "MwSt" },
+  DE: { currency: "EUR", locale: "de", taxRate: 0.19, taxLabel: "MwSt." },
   FR: { currency: "EUR", locale: "fr", taxRate: 0.20, taxLabel: "TVA" },
   ES: { currency: "EUR", locale: "es", taxRate: 0.21, taxLabel: "IVA" },
   IT: { currency: "EUR", locale: "es", taxRate: 0.22, taxLabel: "IVA" },
