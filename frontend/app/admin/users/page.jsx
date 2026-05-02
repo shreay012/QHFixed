@@ -11,6 +11,7 @@ import {
   ErrorBox,
   Button,
   EmptyState,
+  BulkBar,
 } from '@/components/staff/ui';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -147,6 +148,18 @@ export default function AdminUsersPage() {
   const [busy, setBusy]                 = useState({});
   const [suspendConfirm, setSuspendConfirm] = useState(null);
 
+  // Bulk selection — set of _ids the admin has ticked. Bulk suspend /
+  // activate fires the existing PATCH /users/:id/status endpoint in
+  // parallel and refreshes the list once.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const toggleSelect = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+
   // ── fetch ──────────────────────────────────────────────────────────────────
   const load = useCallback(() => {
     setItems(null);
@@ -198,8 +211,60 @@ export default function AdminUsersPage() {
     );
   });
 
+  const isAllVisibleSelected =
+    filteredItems.length > 0 && filteredItems.every((u) => selectedIds.has(u._id));
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (isAllVisibleSelected) filteredItems.forEach((u) => next.delete(u._id));
+      else filteredItems.forEach((u) => next.add(u._id));
+      return next;
+    });
+  };
+
+  const bulkSetStatus = async (status) => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => staffApi.patch(`/admin/users/${id}/status`, { status })),
+      );
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      const ok = results.length - failed;
+      if (ok > 0) showSuccess(`${ok} user${ok === 1 ? '' : 's'} ${status === 'active' ? 'activated' : 'suspended'}.`);
+      if (failed > 0) showError(`${failed} user${failed === 1 ? '' : 's'} failed — try again.`);
+      clearSelection();
+      load();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   // ── table columns ──────────────────────────────────────────────────────────
   const columns = [
+    {
+      key: '__select',
+      label: (
+        <input
+          type="checkbox"
+          checked={isAllVisibleSelected}
+          onChange={toggleAllVisible}
+          className="w-4 h-4 rounded border-[#D6EBCF] text-[#45A735] focus:ring-[#45A735] cursor-pointer"
+          aria-label="Select all visible"
+        />
+      ),
+      render: (r) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(r._id)}
+          onChange={(e) => { e.stopPropagation(); toggleSelect(r._id); }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-[#D6EBCF] text-[#45A735] focus:ring-[#45A735] cursor-pointer"
+          aria-label={`Select user ${r.name || r.mobile || r._id}`}
+        />
+      ),
+    },
     {
       key: 'user',
       label: 'User',
@@ -321,6 +386,30 @@ export default function AdminUsersPage() {
             </button>
           )}
         </div>
+
+        {/* Bulk action bar — appears when at least one row is ticked */}
+        {selectedIds.size > 0 && (
+          <div className="flex justify-center">
+            <BulkBar count={selectedIds.size} onClear={clearSelection}>
+              <button
+                type="button"
+                onClick={() => bulkSetStatus('active')}
+                disabled={bulkBusy}
+                className="px-3 py-1 rounded-full text-[11px] font-open-sauce-semibold bg-[#45A735] hover:bg-[#78EB54] hover:text-[#0F3B0F] transition-colors disabled:opacity-50"
+              >
+                {bulkBusy ? 'Working…' : 'Activate all'}
+              </button>
+              <button
+                type="button"
+                onClick={() => bulkSetStatus('suspended')}
+                disabled={bulkBusy}
+                className="px-3 py-1 rounded-full text-[11px] font-open-sauce-semibold bg-amber-500 hover:bg-amber-600 transition-colors disabled:opacity-50"
+              >
+                Suspend all
+              </button>
+            </BulkBar>
+          </div>
+        )}
 
         {/* Table */}
         {items === null && !error && <Spinner />}

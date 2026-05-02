@@ -7,7 +7,7 @@ import staffApi from '@/lib/axios/staffApi';
 import { showError, showSuccess } from '@/lib/utils/toast';
 import {
   PageHeader, Spinner, ErrorBox, Button, Table,
-  SearchInput, Select, Pagination, SectionCard, EmptyState,
+  SearchInput, Select, Pagination, SectionCard, EmptyState, BulkBar,
 } from '@/components/staff/ui';
 
 const PAGE_SIZE = 20;
@@ -53,6 +53,44 @@ export default function AdminServicesPage() {
   const updateQ      = (v) => { setQ(v); setPage(1); };
   const updateActive = (e) => { setActiveFilter(e.target.value); setPage(1); };
 
+  // Bulk selection — fires PUT /admin/services/:id with { active }
+  // for every ticked row in parallel and refreshes the list.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const toggleSelect = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+  const isAllVisibleSelected = (items || []).length > 0 && (items || []).every((i) => selectedIds.has(i._id));
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (isAllVisibleSelected) (items || []).forEach((i) => next.delete(i._id));
+      else (items || []).forEach((i) => next.add(i._id));
+      return next;
+    });
+  };
+  const bulkSetActive = async (active) => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => staffApi.put(`/admin/services/${id}`, { active })),
+      );
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      const ok = results.length - failed;
+      if (ok > 0) showSuccess(`${ok} service${ok === 1 ? '' : 's'} ${active ? 'activated' : 'deactivated'}.`);
+      if (failed > 0) showError(`${failed} service${failed === 1 ? '' : 's'} failed — try again.`);
+      clearSelection();
+      load();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const handleDelete = async (s) => {
     try {
       await staffApi.delete(`/admin/services/${s._id}`);
@@ -66,6 +104,28 @@ export default function AdminServicesPage() {
   };
 
   const cols = [
+    {
+      key: '__select',
+      label: (
+        <input
+          type="checkbox"
+          checked={isAllVisibleSelected}
+          onChange={toggleAllVisible}
+          className="w-4 h-4 rounded border-[#D6EBCF] text-[#45A735] focus:ring-[#45A735] cursor-pointer"
+          aria-label="Select all visible"
+        />
+      ),
+      render: (s) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(s._id)}
+          onChange={(e) => { e.stopPropagation(); toggleSelect(s._id); }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-[#D6EBCF] text-[#45A735] focus:ring-[#45A735] cursor-pointer"
+          aria-label={`Select service ${s._id}`}
+        />
+      ),
+    },
     {
       key: 'name',
       label: 'Name',
@@ -198,6 +258,31 @@ export default function AdminServicesPage() {
           </div>
         </SectionCard>
         <ErrorBox error={error} />
+
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex justify-center">
+            <BulkBar count={selectedIds.size} onClear={clearSelection}>
+              <button
+                type="button"
+                onClick={() => bulkSetActive(true)}
+                disabled={bulkBusy}
+                className="px-3 py-1 rounded-full text-[11px] font-open-sauce-semibold bg-[#45A735] hover:bg-[#78EB54] hover:text-[#0F3B0F] transition-colors disabled:opacity-50"
+              >
+                {bulkBusy ? 'Working…' : 'Activate'}
+              </button>
+              <button
+                type="button"
+                onClick={() => bulkSetActive(false)}
+                disabled={bulkBusy}
+                className="px-3 py-1 rounded-full text-[11px] font-open-sauce-semibold bg-amber-500 hover:bg-amber-600 transition-colors disabled:opacity-50"
+              >
+                Deactivate
+              </button>
+            </BulkBar>
+          </div>
+        )}
+
         {items === null && !error && <Spinner />}
         {items !== null && items.length === 0 && (
           <EmptyState

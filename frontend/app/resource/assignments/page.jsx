@@ -14,6 +14,7 @@ import {
   Select,
   Pagination,
   SectionCard,
+  EmptyState,
 } from '@/components/staff/ui';
 
 const PAGE_SIZE = 20;
@@ -88,9 +89,16 @@ export default function ResourceAssignmentsPage() {
 
   return (
     <div>
-      <PageHeader title="Assignments" subtitle="Bookings allocated to you by your PM" />
+      <PageHeader
+        title="Assignments"
+        subtitle="Bookings allocated to you by your PM"
+        helpText="Click any row to open the booking, log time, or chat with the customer."
+      />
       <div className="p-4 sm:p-8 space-y-4">
-        <SectionCard title="Filters">
+        <SectionCard
+          title="Filters"
+          description="Narrow your assignments by status or search by customer / mobile / email / booking ID."
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <SearchInput
               value={q}
@@ -106,17 +114,37 @@ export default function ResourceAssignmentsPage() {
               {meta.total != null && `${meta.total} assignment${meta.total === 1 ? '' : 's'} match`}
             </div>
           </div>
+          {(status || q.trim()) && (
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-[#E5F1E2]">
+              <span className="text-[11px] uppercase tracking-wider text-[#909090] font-open-sauce-semibold">Applied:</span>
+              {q.trim() && <ResFilterChip label={`Search: "${q.trim()}"`} onRemove={() => updateQ('')} />}
+              {status   && <ResFilterChip label={`Status: ${status.replace(/_/g, ' ')}`} onRemove={() => updateStatus({ target: { value: '' } })} />}
+            </div>
+          )}
         </SectionCard>
 
         <ErrorBox error={error} />
         {items === null && !error && <Spinner />}
-        {items !== null && (
+        {items !== null && items.length === 0 && (
+          <EmptyState
+            title={status || q ? 'No assignments match these filters' : 'No assignments yet'}
+            description={
+              status || q
+                ? 'Try clearing the filter or expanding the search.'
+                : 'Your PM will assign bookings here. Once they do, you’ll see them appear in real time.'
+            }
+            action={
+              (status || q) && (
+                <Button variant="subtle" size="md" onClick={() => { updateQ(''); updateStatus({ target: { value: '' } }); }}>
+                  Clear filters
+                </Button>
+              )
+            }
+          />
+        )}
+        {items !== null && items.length > 0 && (
           <>
-            <Table
-              columns={columns}
-              rows={items}
-              empty="No assignments yet. Ask your PM to assign you to a booking."
-            />
+            <Table columns={columns} rows={items} />
             <Pagination
               page={page}
               total={meta.total || 0}
@@ -127,5 +155,25 @@ export default function ResourceAssignmentsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Local filter chip — same shape as the admin pages, kept inline
+// rather than hoisting to ui.jsx until we have 3+ adopters.
+function ResFilterChip({ label, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F2F9F1] text-[#26472B] text-[11px] font-open-sauce-semibold ring-1 ring-[#D6EBCF]">
+      <span className="truncate max-w-[180px]">{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="-mr-0.5 ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-[#D6EBCF] transition-colors"
+        aria-label={`Remove ${label}`}
+      >
+        <svg width={9} height={9} viewBox="0 0 24 24" fill="none">
+          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+        </svg>
+      </button>
+    </span>
   );
 }

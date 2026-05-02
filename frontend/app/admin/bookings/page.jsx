@@ -14,6 +14,7 @@ import {
   Button,
   EmptyState,
   Pagination,
+  BulkBar,
 } from '@/components/staff/ui';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -77,6 +78,66 @@ export default function AdminBookingsPage() {
   const [busyConfirm, setBusyConfirm] = useState(null);
   const [busyReject, setBusyReject]   = useState(null);
   const [busyAssign, setBusyAssign]   = useState(false);
+
+  // ─── Bulk selection ───────────────────────────────────────────────────────
+  // selectedIds is a Set of booking ids. Lets the admin tick a few rows
+  // and confirm / cancel them all in one shot — the most-asked-for ops
+  // workflow on this page.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const toggleSelect = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+  const isAllVisibleSelected =
+    Array.isArray(bookings) && bookings.length > 0 &&
+    bookings.every((b) => selectedIds.has(b._id));
+  const toggleAllVisible = () => {
+    if (!Array.isArray(bookings)) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (isAllVisibleSelected) {
+        bookings.forEach((b) => next.delete(b._id));
+      } else {
+        bookings.forEach((b) => next.add(b._id));
+      }
+      return next;
+    });
+  };
+
+  // Bulk confirm / cancel — fire requests in parallel and refresh once.
+  // Failures are surfaced via toast with a count of how many failed so
+  // the admin can decide whether to retry.
+  const bulkAction = async (kind) => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setBulkBusy(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          kind === 'confirm'
+            ? staffApi.post(`/admin/bookings/${id}/confirm`)
+            : staffApi.patch(`/admin/bookings/${id}/reject`, { reason: '' }),
+        ),
+      );
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      const ok = results.length - failed;
+      if (ok > 0) {
+        showSuccess(
+          `${ok} booking${ok === 1 ? '' : 's'} ${kind === 'confirm' ? 'confirmed' : 'cancelled'}.`,
+        );
+      }
+      if (failed > 0) {
+        showError(`${failed} booking${failed === 1 ? '' : 's'} failed — check status and retry.`);
+      }
+      clearSelection();
+      await load();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   // ─── Load bookings ────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -164,7 +225,32 @@ export default function AdminBookingsPage() {
   };
 
   // ─── Table columns ────────────────────────────────────────────────────────
+  // Leading checkbox column is wired into selectedIds + toggleAllVisible
+  // so the admin can multi-select bookings and then trigger bulk
+  // confirm / cancel from the BulkBar above the table.
   const columns = [
+    {
+      key: '__select',
+      label: (
+        <input
+          type="checkbox"
+          checked={isAllVisibleSelected}
+          onChange={toggleAllVisible}
+          className="w-4 h-4 rounded border-[#D6EBCF] text-[#45A735] focus:ring-[#45A735] cursor-pointer"
+          aria-label="Select all visible"
+        />
+      ),
+      render: (r) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(r._id)}
+          onChange={(e) => { e.stopPropagation(); toggleSelect(r._id); }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-[#D6EBCF] text-[#45A735] focus:ring-[#45A735] cursor-pointer"
+          aria-label={`Select booking ${String(r._id).slice(-8)}`}
+        />
+      ),
+    },
     {
       key: 'booking',
       label: 'Booking',
@@ -389,6 +475,30 @@ export default function AdminBookingsPage() {
             <div className="text-xs text-[#909090]">
               Page {page} of {Math.max(1, totalPages)}
             </div>
+          </div>
+        )}
+
+        {/* Bulk action bar — shows when at least one row is selected. */}
+        {selectedIds.size > 0 && (
+          <div className="flex justify-center">
+            <BulkBar count={selectedIds.size} onClear={clearSelection}>
+              <button
+                type="button"
+                onClick={() => bulkAction('confirm')}
+                disabled={bulkBusy}
+                className="px-3 py-1 rounded-full text-[11px] font-open-sauce-semibold bg-[#45A735] hover:bg-[#78EB54] hover:text-[#0F3B0F] transition-colors disabled:opacity-50"
+              >
+                {bulkBusy ? 'Working…' : 'Confirm all'}
+              </button>
+              <button
+                type="button"
+                onClick={() => bulkAction('reject')}
+                disabled={bulkBusy}
+                className="px-3 py-1 rounded-full text-[11px] font-open-sauce-semibold bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                Cancel all
+              </button>
+            </BulkBar>
           </div>
         )}
 

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import staffApi from '@/lib/axios/staffApi';
-import { PageHeader, Spinner, ErrorBox, Button } from '@/components/staff/ui';
+import { PageHeader, Spinner, ErrorBox, Button, StickyActionBar } from '@/components/staff/ui';
 import { showSuccess, showError } from '@/lib/utils/toast';
 
 const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -112,9 +112,16 @@ function TimeInput({ id, value, onChange }) {
 export default function AdminSchedulingPage() {
   const [rawConfig, setRawConfig] = useState(null); // full server response preserved
   const [form, setForm] = useState(DEFAULT_CONFIG);
+  // Snapshot of the form right after the most recent successful load /
+  // save. Used to compute the "Unsaved changes" indicator that drives
+  // the sticky action bar status.
+  const [savedSnapshot, setSavedSnapshot] = useState(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+
+  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedSnapshot), [form, savedSnapshot]);
 
   // Load config on mount
   useEffect(() => {
@@ -125,7 +132,7 @@ export default function AdminSchedulingPage() {
         const r = await staffApi.get('/admin/scheduling-config');
         const config = r.data?.data?.config ?? {};
         setRawConfig(config);
-        setForm({
+        const next = {
           maxBookingsPerDay: config.maxBookingsPerDay ?? DEFAULT_CONFIG.maxBookingsPerDay,
           advanceBookingDays: config.advanceBookingDays ?? DEFAULT_CONFIG.advanceBookingDays,
           minLeadTimeHours: config.minLeadTimeHours ?? DEFAULT_CONFIG.minLeadTimeHours,
@@ -138,7 +145,9 @@ export default function AdminSchedulingPage() {
           workingDays: Array.isArray(config.workingDays)
             ? config.workingDays
             : DEFAULT_CONFIG.workingDays,
-        });
+        };
+        setForm(next);
+        setSavedSnapshot(next);
       } catch (e) {
         setError(e);
       } finally {
@@ -163,8 +172,12 @@ export default function AdminSchedulingPage() {
       // Spread rawConfig first so any unknown server fields are preserved
       const body = { ...(rawConfig ?? {}), ...form };
       await staffApi.put('/admin/scheduling-config', body);
-      // Keep rawConfig in sync with what we just saved
       setRawConfig(body);
+      setSavedSnapshot(form); // mark current form as the new "saved" baseline
+      setJustSaved(true);
+      // Clear the "Saved ✓" flash after a few seconds so the bar returns
+      // to its idle state if the user lingers without making changes.
+      setTimeout(() => setJustSaved(false), 4000);
       showSuccess('Scheduling config saved.');
     } catch (e) {
       showError(e?.response?.data?.error?.message || 'Failed to save scheduling config.');
@@ -173,11 +186,17 @@ export default function AdminSchedulingPage() {
     }
   };
 
+  const handleDiscard = () => {
+    setForm(savedSnapshot);
+    setJustSaved(false);
+  };
+
   return (
     <div>
       <PageHeader
         title="Scheduling Configuration"
         subtitle="Control booking rules and availability windows"
+        helpText="These rules apply globally. Changes affect every customer's booking flow on the next page load."
       />
 
       <div className="p-4 sm:p-8 space-y-6">
@@ -349,27 +368,47 @@ export default function AdminSchedulingPage() {
               </Field>
             </Section>
 
-            {/* ── Save button ──────────────────────────────────────────── */}
-            <div className="flex justify-end pt-2">
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={handleSave}
-                disabled={saving || form.workingDays.length === 0}
-              >
-                {saving ? (
-                  <>
-                    <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </Button>
-            </div>
           </>
         )}
       </div>
+
+      {/* Sticky bottom bar — visible whenever the form has changed
+          relative to the last successful save. Replaces the lonely
+          "Save Changes" button at the end of the form so the user
+          never has to scroll to find it on long config screens. */}
+      {!loading && !error && (dirty || saving || justSaved) && (
+        <StickyActionBar
+          status={
+            saving       ? 'Saving changes…' :
+            justSaved    ? 'All changes saved' :
+            dirty        ? 'You have unsaved changes' :
+                           ''
+          }
+          statusKind={
+            saving    ? 'saving' :
+            justSaved ? 'saved'  :
+            dirty     ? 'dirty'  :
+                        'idle'
+          }
+        >
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={handleDiscard}
+            disabled={saving || !dirty}
+          >
+            Discard
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handleSave}
+            disabled={saving || !dirty || form.workingDays.length === 0}
+          >
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
+        </StickyActionBar>
+      )}
     </div>
   );
 }

@@ -163,6 +163,12 @@ export default function AdminTicketDetailPage() {
       <PageHeader
         title={`Ticket #${String(id).slice(-8)}`}
         subtitle={ticket.subject || 'Support Ticket'}
+        breadcrumbs={[
+          { label: 'Admin',   href: '/admin' },
+          { label: 'Tickets', href: '/admin/tickets' },
+          { label: `#${String(id).slice(-8)}` },
+        ]}
+        helpText="Update status from the right column. Reply to the customer in the message thread; replies are sent via email + in-app notification."
         action={
           <Button variant="subtle" onClick={() => router.back()}>
             ← Back to Tickets

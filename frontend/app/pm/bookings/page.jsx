@@ -17,6 +17,7 @@ import {
   Select,
   Pagination,
   SectionCard,
+  EmptyState,
 } from '@/components/staff/ui';
 
 const PAGE_SIZE = 20;
@@ -172,9 +173,16 @@ export default function PmBookingsPage() {
 
   return (
     <div>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} />
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        helpText="Click any row to open the booking detail. Use the live worked-time column to verify ongoing sessions."
+      />
       <div className="p-4 sm:p-8 space-y-4">
-        <SectionCard title="Filters">
+        <SectionCard
+          title="Filters"
+          description="Search across customer, mobile, email, or any part of the booking ID."
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <SearchInput
               value={q}
@@ -190,13 +198,37 @@ export default function PmBookingsPage() {
               {meta.total != null && `${meta.total} booking${meta.total === 1 ? '' : 's'} match`}
             </div>
           </div>
+          {(status || q.trim()) && (
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-[#E5F1E2]">
+              <span className="text-[11px] uppercase tracking-wider text-[#909090] font-open-sauce-semibold">Applied:</span>
+              {q.trim() && <PmFilterChip label={`Search: "${q.trim()}"`} onRemove={() => setQ('')} />}
+              {status   && <PmFilterChip label={`Status: ${status.replace(/_/g, ' ')}`} onRemove={() => setStatus('')} />}
+            </div>
+          )}
         </SectionCard>
 
         <ErrorBox error={error} />
         {items === null && !error && <Spinner />}
-        {items !== null && (
+        {items !== null && items.length === 0 && (
+          <EmptyState
+            title={status || q ? 'No bookings match these filters' : 'No bookings assigned yet'}
+            description={
+              status || q
+                ? 'Try clearing the filter or expanding the search.'
+                : 'Bookings appear here once an admin assigns them to you.'
+            }
+            action={
+              (status || q) && (
+                <Button variant="subtle" size="md" onClick={() => { setQ(''); setStatus(''); }}>
+                  Clear filters
+                </Button>
+              )
+            }
+          />
+        )}
+        {items !== null && items.length > 0 && (
           <>
-            <Table columns={columns} rows={items} empty={t('noResults')} />
+            <Table columns={columns} rows={items} />
             <Pagination
               page={page}
               total={meta.total || 0}
@@ -207,5 +239,24 @@ export default function PmBookingsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Removable chip rendered in the "Applied:" filter strip.
+function PmFilterChip({ label, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F2F9F1] text-[#26472B] text-[11px] font-open-sauce-semibold ring-1 ring-[#D6EBCF]">
+      <span className="truncate max-w-[180px]">{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="-mr-0.5 ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-[#D6EBCF] transition-colors"
+        aria-label={`Remove ${label}`}
+      >
+        <svg width={9} height={9} viewBox="0 0 24 24" fill="none">
+          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+        </svg>
+      </button>
+    </span>
   );
 }

@@ -337,8 +337,14 @@ export default function AdminBookingDetailPage() {
       {/* ── Page Header ──────────────────────────────────────────────────── */}
       <PageHeader
         title={`Booking #${bookingId.slice(-8)}`}
-        subtitle="Full booking control — assign, monitor, chat, cancel"
+        subtitle={`${job.customerName || 'Customer'} · ${job.serviceName || 'Service'} · ${job.status?.replace(/_/g, ' ') || 'pending'}`}
         backHref="/admin/bookings"
+        breadcrumbs={[
+          { label: 'Admin',    href: '/admin' },
+          { label: 'Bookings', href: '/admin/bookings' },
+          { label: `#${bookingId.slice(-8)}` },
+        ]}
+        helpText="Use the right column to assign a PM, transition status, message participants, or cancel the booking."
         action={
           <Button variant="subtle" size="sm" onClick={() => router.push('/admin/bookings')}>
             ← All Bookings
