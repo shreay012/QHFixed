@@ -21,6 +21,7 @@ import { paginate, buildMeta } from '../../utils/pagination.js';
 import { PERMS } from '../../config/rbac.js';
 import { enqueueJob, QUEUES } from '../../queue/index.js';
 import { redis } from '../../config/redis.js';
+import { streamCursorAsCsv } from '../../utils/csvStream.js';
 
 const r = Router();
 r.use(adminGuard);
@@ -115,6 +116,88 @@ r.get('/refunds', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) =
     refundsCol().countDocuments(filter),
   ]);
   res.json({ success: true, data: items, meta: buildMeta({ page: p.page, pageSize: p.pageSize, total }) });
+}));
+
+// Streaming CSV export — same filters as the list endpoint above so
+// admins can "filter then export". Designed for finance / accounting
+// teams that need raw rows in a spreadsheet.
+r.get('/refunds.csv', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) => {
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.bookingId) {
+    try { filter.bookingId = toObjectId(req.query.bookingId); } catch { /* ignore */ }
+  }
+  const cursor = refundsCol().find(filter).sort({ createdAt: -1 });
+  await streamCursorAsCsv(res, {
+    filename: `refunds-${new Date().toISOString().slice(0, 10)}.csv`,
+    cursor,
+    columns: [
+      { header: 'Refund ID',   key: '_id',       format: (v) => String(v) },
+      { header: 'Booking ID',  key: 'bookingId', format: (v) => (v ? String(v) : '') },
+      { header: 'Payment ID',  key: 'paymentId', format: (v) => (v ? String(v) : '') },
+      { header: 'Status',      key: 'status' },
+      { header: 'Reason',      key: 'reason' },
+      { header: 'Amount',      key: 'amount' },
+      { header: 'Currency',    key: 'currency' },
+      { header: 'Country',     key: 'country' },
+      { header: 'Notes',       key: 'notes' },
+      { header: 'Requested at',key: 'createdAt',  format: (v) => (v ? new Date(v).toISOString() : '') },
+      { header: 'Reviewed at', key: 'reviewedAt', format: (v) => (v ? new Date(v).toISOString() : '') },
+    ],
+  });
+}));
+
+r.get('/payouts.csv', permGuard(PERMS.PAYOUT_WRITE), asyncHandler(async (req, res) => {
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.role)   filter.role   = req.query.role;
+  const cursor = payoutsCol().find(filter).sort({ cycleStart: -1 });
+  await streamCursorAsCsv(res, {
+    filename: `payouts-${new Date().toISOString().slice(0, 10)}.csv`,
+    cursor,
+    columns: [
+      { header: 'Payout ID',     key: '_id',         format: (v) => String(v) },
+      { header: 'Staff ID',      key: 'staffId',     format: (v) => (v ? String(v) : '') },
+      { header: 'Staff name',    key: 'staffName' },
+      { header: 'Role',          key: 'role' },
+      { header: 'Status',        key: 'status' },
+      { header: 'Cycle start',   key: 'cycleStart',  format: (v) => (v ? new Date(v).toISOString().slice(0, 10) : '') },
+      { header: 'Cycle end',     key: 'cycleEnd',    format: (v) => (v ? new Date(v).toISOString().slice(0, 10) : '') },
+      { header: 'Amount',        key: 'amount' },
+      { header: 'Currency',      key: 'currency' },
+      { header: 'Commission %',  key: 'commissionPct' },
+      { header: 'UTR ref',       key: 'utr' },
+      { header: 'Processed at',  key: 'processedAt', format: (v) => (v ? new Date(v).toISOString() : '') },
+    ],
+  });
+}));
+
+r.get('/audit-logs.csv', permGuard(PERMS.AUDIT_READ), asyncHandler(async (req, res) => {
+  const filter = {};
+  if (req.query.actorRole) filter['actor.role'] = String(req.query.actorRole);
+  if (req.query.method)    filter.method        = String(req.query.method);
+  if (req.query.from || req.query.to) {
+    filter.at = {};
+    if (req.query.from) filter.at.$gte = new Date(String(req.query.from));
+    if (req.query.to)   filter.at.$lte = new Date(String(req.query.to));
+  }
+  const cursor = auditCol().find(filter).sort({ at: -1 });
+  await streamCursorAsCsv(res, {
+    filename: `audit-${new Date().toISOString().slice(0, 10)}.csv`,
+    cursor,
+    columns: [
+      { header: 'Timestamp',  key: 'at',           format: (v) => (v ? new Date(v).toISOString() : '') },
+      { header: 'Actor ID',   key: 'actor.id',     format: (v) => (v ? String(v) : '') },
+      { header: 'Actor role', key: 'actor.role' },
+      { header: 'Method',     key: 'method' },
+      { header: 'Resource',   key: 'resource' },
+      { header: 'Resource ID',key: 'resourceId',   format: (v) => (v ? String(v) : '') },
+      { header: 'Path',       key: 'path' },
+      { header: 'Status',     key: 'status' },
+      { header: 'IP',         key: 'ip' },
+      { header: 'User agent', key: 'userAgent' },
+    ],
+  });
 }));
 
 // Initiate refund (ops can request; finance approves)

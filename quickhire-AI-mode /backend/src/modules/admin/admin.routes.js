@@ -12,6 +12,7 @@ import { CACHE_KEYS } from '../../utils/cache.keys.js';
 import { ObjectId } from 'mongodb';
 import { paginate, buildMeta } from '../../utils/pagination.js';
 import { searchBookings as meiliSearchBookings, searchResources as meiliSearchResources, isMeiliReady } from '../../config/meilisearch.js';
+import { streamCursorAsCsv } from '../../utils/csvStream.js';
 import * as bookingService from '../booking/booking.service.js';
 import { AppError } from '../../utils/AppError.js';
 import { toObjectId } from '../../utils/oid.js';
@@ -380,6 +381,95 @@ r.get('/payments/stats', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (_req
     };
   }, 60);
   res.json({ success: true, data });
+}));
+
+/**
+ * CSV export endpoints — finance + ops + compliance teams need raw row
+ * data for spreadsheets / accounting / tax filings. Each export streams
+ * the underlying Mongo cursor straight into the response so memory
+ * usage stays flat regardless of how many rows are returned. Honours
+ * the same filters as the matching list endpoint so an admin can
+ * "filter then export" instead of pulling everything every time.
+ */
+r.get('/payments.csv', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) => {
+  const { status, country, currency, gateway, q, from, to, userId, jobId } = req.query;
+  const filter = {};
+  if (status)   filter.status   = String(status);
+  if (country)  filter.country  = String(country).toUpperCase();
+  if (currency) filter.currency = String(currency).toUpperCase();
+  if (gateway)  filter.provider = String(gateway).toLowerCase();
+  if (userId) { try { filter.userId = new ObjectId(String(userId)); } catch { /* ignore */ } }
+  if (jobId)  { try { filter.jobId  = new ObjectId(String(jobId));  } catch { /* ignore */ } }
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(String(from));
+    if (to)   filter.createdAt.$lte = new Date(String(to));
+  }
+  if (q) {
+    const needle = String(q).trim();
+    filter.$or = [
+      { paymentId: needle },
+      { orderId:   needle },
+      { paymentId: { $regex: needle, $options: 'i' } },
+      { orderId:   { $regex: needle, $options: 'i' } },
+    ];
+  }
+
+  const cursor = paymentsCol().find(filter).sort({ createdAt: -1 });
+  await streamCursorAsCsv(res, {
+    filename: `payments-${new Date().toISOString().slice(0, 10)}.csv`,
+    cursor,
+    columns: [
+      { header: 'Payment ID',  key: 'paymentId' },
+      { header: 'Order ID',    key: 'orderId' },
+      { header: 'Provider',    key: 'provider' },
+      { header: 'Status',      key: 'status' },
+      { header: 'Amount',      key: 'amount' },
+      { header: 'Currency',    key: 'currency' },
+      { header: 'Country',     key: 'country' },
+      { header: 'Mock',        key: 'mock', format: (v) => (v ? 'yes' : 'no') },
+      { header: 'Customer ID', key: 'userId', format: (v) => (v ? String(v) : '') },
+      { header: 'Job ID',      key: 'jobId',  format: (v) => (v ? String(v) : '') },
+      { header: 'Booking ID',  key: 'bookingId', format: (v) => (v ? String(v) : '') },
+      { header: 'Subtotal',    key: 'invoice.subtotal' },
+      { header: 'Tax name',    key: 'invoice.tax.name' },
+      { header: 'Tax rate',    key: 'invoice.tax.rate' },
+      { header: 'Tax amount',  key: 'invoice.tax.amount' },
+      { header: 'Total',       key: 'invoice.total' },
+      { header: 'Created at',  key: 'createdAt', format: (v) => (v ? new Date(v).toISOString() : '') },
+      { header: 'Updated at',  key: 'updatedAt', format: (v) => (v ? new Date(v).toISOString() : '') },
+    ],
+  });
+}));
+
+r.get('/bookings.csv', permGuard(PERMS.BOOKING_READ), asyncHandler(async (req, res) => {
+  const filter = {};
+  if (req.query.status) filter.status = String(req.query.status);
+  if (req.query.from || req.query.to) {
+    filter.createdAt = {};
+    if (req.query.from) filter.createdAt.$gte = new Date(String(req.query.from));
+    if (req.query.to)   filter.createdAt.$lte = new Date(String(req.query.to));
+  }
+  const cursor = jobsCol().find(filter).sort({ createdAt: -1 });
+  await streamCursorAsCsv(res, {
+    filename: `bookings-${new Date().toISOString().slice(0, 10)}.csv`,
+    cursor,
+    columns: [
+      { header: 'Booking ID',     key: '_id', format: (v) => String(v) },
+      { header: 'Status',         key: 'status' },
+      { header: 'Customer name',  key: 'customerName' },
+      { header: 'Customer mobile',key: 'customerMobile' },
+      { header: 'Customer email', key: 'customerEmail' },
+      { header: 'Service',        key: 'serviceName' },
+      { header: 'PM ID',          key: 'pmId',       format: (v) => (v ? String(v) : '') },
+      { header: 'Resource ID',    key: 'resourceId', format: (v) => (v ? String(v) : '') },
+      { header: 'Country',        key: 'country' },
+      { header: 'Amount',         key: 'pricing.total' },
+      { header: 'Currency',       key: 'pricing.currency' },
+      { header: 'Created at',     key: 'createdAt', format: (v) => (v ? new Date(v).toISOString() : '') },
+      { header: 'Paid at',        key: 'paidAt',    format: (v) => (v ? new Date(v).toISOString() : '') },
+    ],
+  });
 }));
 
 r.get('/payments/:id', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) => {

@@ -269,6 +269,45 @@ r.post('/admin/doc', adminGuard, permGuard(PERMS.CMS_WRITE), validate(publishDoc
    Manually retire (unpublish) a specific document version.
 ══════════════════════════════════════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════════
+   ADMIN — POST /legal/admin/doc/:id/revert
+   Revert to a previous version: marks the target version as the new
+   `published` doc for that country+type, and supersedes whatever is
+   currently live. Useful when a freshly published version turns out
+   to be wrong and you need to roll back without re-typing the prior
+   content. Append-only history is preserved — we don't delete the
+   bad version, just demote it to `superseded`.
+══════════════════════════════════════════════════════════════════ */
+r.post('/admin/doc/:id/revert', adminGuard, permGuard(PERMS.CMS_WRITE), asyncHandler(async (req, res) => {
+  const target = await docsCol().findOne({ _id: toObjectId(req.params.id, 'id') });
+  if (!target) throw new AppError('RESOURCE_NOT_FOUND', 'Document version not found', 404);
+  const now = new Date();
+
+  // Demote whatever is currently published for this country+type
+  await docsCol().updateMany(
+    { countryCode: target.countryCode, docType: target.docType, status: 'published', _id: { $ne: target._id } },
+    { $set: { status: 'superseded', supersededAt: now } },
+  );
+
+  // Promote the target back to published. Stash a revert audit trail
+  // on the doc itself so the history viewer can label the row.
+  await docsCol().updateOne(
+    { _id: target._id },
+    {
+      $set: {
+        status: 'published',
+        publishedAt: now,
+        revertedAt: now,
+        revertedBy: req.user.id,
+      },
+      $unset: { supersededAt: '', retiredAt: '', retiredBy: '' },
+    },
+  );
+
+  const updated = await docsCol().findOne({ _id: target._id });
+  res.json({ success: true, data: updated });
+}));
+
 r.patch('/admin/doc/:id/retire', adminGuard, permGuard(PERMS.CMS_WRITE), asyncHandler(async (req, res) => {
   const result = await docsCol().findOneAndUpdate(
     { _id: toObjectId(req.params.id, 'id') },

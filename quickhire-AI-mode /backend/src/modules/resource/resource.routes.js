@@ -82,8 +82,50 @@ async function hydrateJobs(jobs) {
 }
 
 r.get('/me', asyncHandler(async (req, res) => {
-  res.json({ success: true, data: { id: req.user.id, role: 'resource' } });
+  // Hydrate availability from the user record so the FE shell can show
+  // the current online/offline state on first paint without a separate
+  // round-trip.
+  const u = await usersCol().findOne(
+    { _id: new ObjectId(req.user.id) },
+    { projection: { 'meta.availability': 1, 'meta.availabilityChangedAt': 1 } },
+  );
+  res.json({
+    success: true,
+    data: {
+      id: req.user.id,
+      role: 'resource',
+      availability: u?.meta?.availability || 'offline',
+      availabilityChangedAt: u?.meta?.availabilityChangedAt || null,
+    },
+  });
 }));
+
+/**
+ * POST /resource/availability — flip the current resource between
+ * "online" (visible to PMs for assignment) and "offline" (hidden,
+ * existing bookings unaffected). Stored on the user record so admins
+ * can see fleet-level availability without joining time-windows.
+ *
+ * Idempotent: setting the same value twice is a no-op write.
+ */
+r.post(
+  '/availability',
+  validate(z.object({ availability: z.enum(['online', 'offline']) })),
+  asyncHandler(async (req, res) => {
+    const now = new Date();
+    await usersCol().updateOne(
+      { _id: new ObjectId(req.user.id) },
+      {
+        $set: {
+          'meta.availability': req.body.availability,
+          'meta.availabilityChangedAt': now,
+          updatedAt: now,
+        },
+      },
+    );
+    res.json({ success: true, data: { availability: req.body.availability, availabilityChangedAt: now } });
+  }),
+);
 
 r.get('/dashboard', asyncHandler(async (req, res) => {
   // Per-resource cache (30s) — collapses 3 Mongo round-trips per refresh

@@ -1,9 +1,34 @@
-import { initializeQueues, registerWorker, QUEUES } from './index.js';
+import { initializeQueues, registerWorker, getQueue, QUEUES } from './index.js';
 import { handleNotificationJob } from './notification.handler.js';
 import { handleLifecycleTick, scheduleLifecycleTick } from './lifecycle.handler.js';
 import { handleAnalyticsJob } from './analytics.handler.js';
 import { handleEmailJob } from './email.handler.js';
 import { logger } from '../config/logger.js';
+
+/**
+ * Schedule the FX-rate refresh job to run once a day at 03:00 UTC
+ * (after Frankfurter's daily ECB pull). Uses BullMQ repeatable jobs so
+ * the schedule survives restarts and only runs once across the worker
+ * fleet thanks to the shared Redis cursor. The fixed jobId means
+ * re-registering the schedule on every boot is idempotent — BullMQ
+ * de-dupes the repeatable.
+ */
+async function scheduleFxRefresh() {
+  try {
+    const queue = getQueue(QUEUES.ANALYTICS);
+    await queue.add(
+      'fx-refresh',
+      { type: 'refresh_fx_rates' },
+      {
+        jobId: 'cron:refresh_fx_rates',
+        repeat: { pattern: '0 3 * * *', tz: 'UTC' }, // daily at 03:00 UTC
+      },
+    );
+    logger.info('fx refresh scheduled (daily 03:00 UTC)');
+  } catch (err) {
+    logger.warn({ err: err.message }, 'failed to schedule fx refresh — running on demand only');
+  }
+}
 
 /**
  * Queue Setup & Integration
@@ -45,6 +70,8 @@ export async function startQueueWorkers() {
 
     // Schedule the recurring lifecycle tick
     await scheduleLifecycleTick();
+    // Schedule daily FX-rate refresh
+    await scheduleFxRefresh();
 
     logger.info('all queue workers started successfully');
   } catch (err) {

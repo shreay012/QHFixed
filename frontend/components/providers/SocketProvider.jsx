@@ -254,6 +254,7 @@ export function SocketProvider({ children }) {
     if (!userState) return;
 
     const { user, token } = userState;
+    const role = user?.role || 'user';
 
     chatSocketService.connect({
       baseUrl: SOCKET_BASE_URL,
@@ -279,6 +280,49 @@ export function SocketProvider({ children }) {
       },
     });
 
+    // Admin-only realtime fan-out: subscribe to the operational events
+    // the backend emits to `role_admin` so the dashboard / lists update
+    // without a manual refresh. We do two things per event:
+    //   1. dispatch a window event so any open page can refetch
+    //   2. for "loud" events (new booking, fraud alert) flash a toast
+    //
+    // Cleanup detaches the listeners on userState change so a logout +
+    // re-login as a non-admin doesn't leak admin-only events.
+    let detachAdminEvents = null;
+    if (role === 'admin' || role === 'super_admin') {
+      const sock = chatSocketService.socket;
+      if (sock) {
+        const fire = (eventName, payload) => {
+          window.dispatchEvent(new CustomEvent('admin:event', { detail: { eventName, payload } }));
+        };
+        const onBookingNew      = (p) => { fire('booking:new', p);
+          renderIncomingNotification({ title: 'New booking', message: `Booking #${String(p?.bookingId || '').slice(-8)} placed`, type: 'BOOKING_CREATED', data: p, _id: `bk-new-${p?.bookingId}` });
+        };
+        const onBookingStatus   = (p) => fire('booking:status', p);
+        const onBookingAssigned = (p) => fire('booking:assigned', p);
+        const onSlaBreach       = (p) => { fire('sla:breach', p);
+          renderIncomingNotification({ title: 'SLA breach', message: `Ticket ${String(p?.ticketId || '').slice(-8)} breached SLA`, type: 'sla_breach', data: p, _id: `sla-${p?.ticketId}` });
+        };
+        const onFraudAlert      = (p) => { fire('fraud:alert', p);
+          renderIncomingNotification({ title: 'Fraud alert', message: p?.reason || 'Suspicious activity flagged', type: 'fraud_alert', data: p, _id: `fr-${p?.id}` });
+        };
+
+        sock.on('booking:new',      onBookingNew);
+        sock.on('booking:status',   onBookingStatus);
+        sock.on('booking:assigned', onBookingAssigned);
+        sock.on('sla:breach',       onSlaBreach);
+        sock.on('fraud:alert',      onFraudAlert);
+
+        detachAdminEvents = () => {
+          sock.off('booking:new',      onBookingNew);
+          sock.off('booking:status',   onBookingStatus);
+          sock.off('booking:assigned', onBookingAssigned);
+          sock.off('sla:breach',       onSlaBreach);
+          sock.off('fraud:alert',      onFraudAlert);
+        };
+      }
+    }
+
     // Request browser notification permission on first connect
     if (
       typeof window !== 'undefined' &&
@@ -288,7 +332,9 @@ export function SocketProvider({ children }) {
       Notification.requestPermission();
     }
 
-    // Cleanup handled by logout flow, not unmount, to prevent ghost disconnects
+    return () => {
+      if (detachAdminEvents) detachAdminEvents();
+    };
   }, [userState]);
 
   return (

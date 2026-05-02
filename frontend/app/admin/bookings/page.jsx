@@ -411,7 +411,26 @@ export default function AdminBookingsPage() {
       <PageHeader
         title="Bookings"
         subtitle="All customer bookings across services"
-        helpText="Click any row to open the full booking detail. Use the filter pills to narrow by status."
+        helpText="Click any row to open the full booking detail. Use the filter pills to narrow by status. Export CSV honours the current status filter."
+        action={
+          <Button
+            variant="subtle"
+            onClick={async () => {
+              try {
+                const stamp = new Date().toISOString().slice(0, 10);
+                const params = new URLSearchParams();
+                if (activeStatus) params.set('status', activeStatus);
+                await import('@/lib/utils/downloadAuthed').then(({ downloadAuthed }) =>
+                  downloadAuthed(`/admin/bookings.csv?${params.toString()}`, `bookings-${stamp}.csv`),
+                );
+              } catch (e) {
+                showError('Failed to export bookings.');
+              }
+            }}
+          >
+            Export CSV
+          </Button>
+        }
       />
 
       {/* ── Status Filter Tabs ────────────────────────────────────────────── */}
