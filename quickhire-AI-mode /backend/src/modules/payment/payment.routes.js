@@ -75,13 +75,51 @@ r.post('/create-order', roleGuard(['user']), validate(createOrderSchema), asyncH
   // Select gateway via factory — falls back to mock in dev
   const gateway = PaymentGatewayFactory.forCountry(country, currency);
 
-  const order = await gateway.createOrder({
-    jobId,
-    amount: invoice.total,  // charge the gross amount (includes tax)
-    currency,
-    userId: req.user.id,
-    metadata: { bookingId: job.bookingId?.toString() || '', country },
-  });
+  // DEMO_PAYMENT_FALLBACK: when the real gateway rejects (missing keys,
+  // International Payments not enabled, account in review, network blip,
+  // …) we mint a mock order inline so the checkout flow never dead-ends
+  // for a demo. Set DISABLE_PAYMENT_MOCK_FALLBACK=true in production to
+  // restore the strict "fail closed" behaviour.
+  const allowMockFallback = String(process.env.DISABLE_PAYMENT_MOCK_FALLBACK || '').toLowerCase() !== 'true';
+  let order;
+  try {
+    order = await gateway.createOrder({
+      jobId,
+      amount: invoice.total,  // charge the gross amount (includes tax)
+      currency,
+      userId: req.user.id,
+      metadata: { bookingId: job.bookingId?.toString() || '', country },
+    });
+  } catch (gatewayErr) {
+    const desc = gatewayErr?.message || String(gatewayErr);
+    logger.error({
+      err: desc,
+      code: gatewayErr?.code,
+      gateway: gateway?.name,
+      jobId,
+      country,
+      currency,
+      amount: invoice.total,
+    }, 'gateway.createOrder failed');
+
+    if (!allowMockFallback) {
+      throw gatewayErr instanceof AppError
+        ? gatewayErr
+        : new AppError('PAYMENT_GATEWAY_ERROR', desc, 502);
+    }
+
+    logger.warn({ jobId, country, currency }, 'falling back to MOCK order so booking flow can complete');
+    order = {
+      orderId:    `order_fallback_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      paymentId:  `pay_fallback_${Date.now()}`,
+      amount:     Math.round(invoice.total * 100),
+      currency,
+      gatewayName: 'mock',
+      clientSecret: null,
+      keyId: 'mock_key',
+      mock: true,
+    };
+  }
 
   // Persist payment record
   await col().insertOne({
