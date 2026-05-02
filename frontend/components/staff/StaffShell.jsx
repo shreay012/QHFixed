@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { staffAuth } from '@/lib/axios/staffApi';
+import GlobalSearch from './GlobalSearch';
 
 const ROLE_META = {
   admin: { label: 'Admin', tag: 'Admin Console' },
@@ -154,6 +155,16 @@ export default function StaffShell({ role, links, children }) {
             {initials}
           </div>
         </div>
+
+        {/* Desktop top bar with global search — admins only. PMs and
+            resources don't have cross-cutting search needs (they work
+            within their own assignments) so the bar would just be
+            visual noise + a useless 401-prone API call for them. */}
+        {role === 'admin' && (
+          <div className="hidden lg:flex sticky top-0 z-30 bg-white border-b border-[#E5F1E2] px-6 h-14 items-center justify-end gap-3">
+            <GlobalSearch />
+          </div>
+        )}
 
         <main className="flex-1 overflow-x-hidden">{children}</main>
       </div>

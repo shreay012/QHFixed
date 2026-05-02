@@ -136,6 +136,109 @@ r.get('/bookings/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, data: hydrated });
 }));
 
+/* ═══════════════════════════════════════════════════════════════════════
+   GLOBAL SEARCH — single endpoint backing the admin shell's command-bar.
+   ?q=… is matched across bookings, customers, payments, and tickets, then
+   results are returned as a tagged union the FE can render in grouped
+   sections and use to deep-link straight to the right detail page.
+
+   Cap is 5 hits per kind (so the dropdown stays scannable) and 24-char
+   hex strings are short-circuited to direct ObjectId lookups so a paste
+   of a booking/payment/user id always lands first.
+══════════════════════════════════════════════════════════════════════ */
+r.get('/search', asyncHandler(async (req, res) => {
+  const raw = String(req.query.q || '').trim();
+  if (raw.length < 2) {
+    return res.json({ success: true, data: { bookings: [], customers: [], payments: [], tickets: [] } });
+  }
+  const safe = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(safe, 'i');
+  const isOid = /^[0-9a-f]{24}$/i.test(raw);
+  const isPartialOid = /^[0-9a-f]{4,23}$/i.test(raw);
+  const oid = (() => { try { return new ObjectId(raw); } catch { return null; } })();
+  const cap = 5;
+
+  // ── Bookings — match _id, partial _id tail, or hydrated customer fields
+  const bookingFilter = { $or: [
+    ...(oid ? [{ _id: oid }] : []),
+    ...(isPartialOid ? [{ $expr: { $regexMatch: { input: { $toString: '$_id' }, regex: re } } }] : []),
+    { customerName: re },
+    { customerMobile: re },
+    { customerEmail: re },
+  ]};
+
+  // ── Customers (role 'user') — name / mobile / email
+  const customerFilter = { role: 'user', $or: [
+    ...(oid ? [{ _id: oid }] : []),
+    { name: re },
+    { mobile: re },
+    { email: re },
+  ]};
+
+  // ── Payments — Razorpay/Stripe IDs are short strings, not ObjectIds.
+  const paymentFilter = { $or: [
+    { paymentId: re },
+    { orderId:   re },
+    ...(oid ? [{ _id: oid }] : []),
+  ]};
+
+  // ── Tickets — subject + ticket _id + linked user
+  const userMatchIds = (await usersCol()
+    .find({ $or: [{ name: re }, { mobile: re }, { email: re }] })
+    .project({ _id: 1 })
+    .limit(20)
+    .toArray()).map((u) => u._id);
+  const ticketFilter = { $or: [
+    { subject: re },
+    ...(oid ? [{ _id: oid }] : []),
+    ...(userMatchIds.length ? [{ userId: { $in: userMatchIds } }] : []),
+  ]};
+
+  const [bookings, customers, payments, tickets] = await Promise.all([
+    jobsCol().find(bookingFilter).sort({ createdAt: -1 }).limit(cap).toArray(),
+    usersCol().find(customerFilter).sort({ createdAt: -1 }).limit(cap).toArray(),
+    paymentsCol().find(paymentFilter).sort({ createdAt: -1 }).limit(cap).toArray(),
+    ticketsCol().find(ticketFilter).sort({ createdAt: -1 }).limit(cap).toArray(),
+  ]);
+
+  // Shape each row into { kind, _id, label, sublabel, route } so the FE
+  // doesn't have to know the schema differences. The route field is what
+  // the global-search bar's onClick handler navigates to.
+  res.json({
+    success: true,
+    data: {
+      bookings: bookings.map((b) => ({
+        kind: 'booking',
+        _id: String(b._id),
+        label: b.customerName || `Booking #${String(b._id).slice(-8)}`,
+        sublabel: `${b.serviceName || 'Booking'} · ${b.status || '—'} · #${String(b._id).slice(-8)}`,
+        route: `/admin/bookings/${b._id}`,
+      })),
+      customers: customers.map((u) => ({
+        kind: 'customer',
+        _id: String(u._id),
+        label: u.name || u.mobile || u.email || 'Customer',
+        sublabel: [u.mobile, u.email].filter(Boolean).join(' · ') || `#${String(u._id).slice(-8)}`,
+        route: `/admin/users?q=${encodeURIComponent(u.mobile || u.email || u.name || '')}`,
+      })),
+      payments: payments.map((p) => ({
+        kind: 'payment',
+        _id: String(p._id),
+        label: p.paymentId || p.orderId || `Payment #${String(p._id).slice(-8)}`,
+        sublabel: `${p.currency || ''} ${p.amount ?? ''} · ${p.status || '—'} · ${p.provider || ''}`.trim(),
+        route: `/admin/payments?q=${encodeURIComponent(p.paymentId || p.orderId || String(p._id))}`,
+      })),
+      tickets: tickets.map((t) => ({
+        kind: 'ticket',
+        _id: String(t._id),
+        label: t.subject || `Ticket #${String(t._id).slice(-8)}`,
+        sublabel: `${t.status || '—'} · ${t.priority || 'normal'} · #${String(t._id).slice(-8)}`,
+        route: `/admin/tickets/${t._id}`,
+      })),
+    },
+  });
+}));
+
 /* ══════════════════════════════════════════════════════════════════════
    PAYMENTS — admin transaction explorer
    - GET /admin/payments               list with filters + pagination
