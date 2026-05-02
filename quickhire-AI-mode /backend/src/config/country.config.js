@@ -74,7 +74,9 @@ export const COUNTRY_CONFIG = {
     timezone: 'Asia/Dubai',
     phonePrefix: '+971',
     rtl: true,
-    gateways: ['stripe', 'tabby'],
+    // RAZORPAY_UNIVERSAL_V1: Razorpay handles AED via international payments
+    // (merchant must have international cards enabled on Razorpay dashboard).
+    gateways: ['razorpay', 'tabby'],
     bnpl: true,
     tax: {
       type: 'vat',
@@ -103,7 +105,9 @@ export const COUNTRY_CONFIG = {
     timezone: 'Europe/Berlin',
     phonePrefix: '+49',
     rtl: false,
-    gateways: ['stripe'],   // Stripe SEPA Debit for EUR
+    // RAZORPAY_UNIVERSAL_V1: Razorpay accepts EUR via international payments
+    // when the merchant has international cards/payouts enabled.
+    gateways: ['razorpay'],
     bnpl: false,
     tax: {
       type: 'vat',
@@ -132,7 +136,8 @@ export const COUNTRY_CONFIG = {
     timezone: 'America/New_York',
     phonePrefix: '+1',
     rtl: false,
-    gateways: ['stripe'],   // Stripe ACH + cards
+    // RAZORPAY_UNIVERSAL_V1: Razorpay accepts USD via international payments.
+    gateways: ['razorpay'],
     bnpl: false,
     tax: {
       // US sales tax varies by state — handled by TaxJar integration, not platform-level
@@ -162,7 +167,8 @@ export const COUNTRY_CONFIG = {
     timezone: 'Australia/Sydney',
     phonePrefix: '+61',
     rtl: false,
-    gateways: ['stripe'],
+    // RAZORPAY_UNIVERSAL_V1: Razorpay accepts AUD via international payments.
+    gateways: ['razorpay'],
     bnpl: false,
     tax: {
       type: 'gst',
@@ -185,7 +191,7 @@ export const COUNTRY_CONFIG = {
   GB: {
     code: 'GB', name: 'United Kingdom', currency: 'GBP', currencySymbol: '£',
     locale: 'en-GB', timezone: 'Europe/London', phonePrefix: '+44', rtl: false,
-    gateways: ['stripe'], bnpl: false,
+    gateways: ['razorpay'], bnpl: false,
     tax: { type: 'vat', rate: 0.20, inclusive: false, name: 'VAT', registrationLabel: 'VAT Number' },
     dataResidency: 'eu-west-2', supportedLangs: ['en'],
     legalDocs: { termsOfService: 'gb-terms-of-service', privacyPolicy: 'gb-privacy-policy', refundPolicy: 'gb-refund-policy' },
@@ -194,7 +200,7 @@ export const COUNTRY_CONFIG = {
   SA: {
     code: 'SA', name: 'Saudi Arabia', currency: 'SAR', currencySymbol: 'SR',
     locale: 'ar-SA', timezone: 'Asia/Riyadh', phonePrefix: '+966', rtl: true,
-    gateways: ['stripe', 'tabby'], bnpl: true,
+    gateways: ['razorpay', 'tabby'], bnpl: true,
     tax: { type: 'vat', rate: 0.15, inclusive: false, name: 'VAT', registrationLabel: 'VAT Number' },
     dataResidency: 'me-south-1', supportedLangs: ['ar', 'en'],
     legalDocs: { termsOfService: 'sa-terms-of-service', privacyPolicy: 'sa-privacy-policy', refundPolicy: 'sa-refund-policy' },
@@ -203,7 +209,7 @@ export const COUNTRY_CONFIG = {
   SG: {
     code: 'SG', name: 'Singapore', currency: 'SGD', currencySymbol: 'S$',
     locale: 'en-SG', timezone: 'Asia/Singapore', phonePrefix: '+65', rtl: false,
-    gateways: ['xendit'], bnpl: false,
+    gateways: ['razorpay'], bnpl: false,
     tax: { type: 'gst', rate: 0.09, inclusive: false, name: 'GST', registrationLabel: 'UEN' },
     dataResidency: 'ap-southeast-1', supportedLangs: ['en'],
     legalDocs: { termsOfService: 'sg-terms-of-service', privacyPolicy: 'sg-privacy-policy', refundPolicy: 'sg-refund-policy' },

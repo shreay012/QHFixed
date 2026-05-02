@@ -8,13 +8,17 @@
  *   const gateway = PaymentGatewayFactory.forCountry(req.geo.country, req.geo.currency);
  *   const order   = await gateway.createOrder({ jobId, amount, currency, userId });
  *
- * Gateway mapping (from COUNTRY_CONFIG):
+ * Gateway mapping (from COUNTRY_CONFIG, RAZORPAY_UNIVERSAL_V1):
  *   IN  → RazorpayGateway  (INR)
- *   AE  → StripeGateway    (AED)
- *   DE  → StripeGateway    (EUR)
- *   US  → StripeGateway    (USD)
- *   AU  → StripeGateway    (AUD)
- *   *   → StripeGateway    (fallback)
+ *   AE  → RazorpayGateway  (AED, international payments enabled)
+ *   DE  → RazorpayGateway  (EUR, international payments enabled)
+ *   US  → RazorpayGateway  (USD, international payments enabled)
+ *   AU  → RazorpayGateway  (AUD, international payments enabled)
+ *   *   → RazorpayGateway  (fallback)
+ *
+ * Razorpay handles every active country via its International Payments
+ * product. The merchant must enable international cards / multi-currency
+ * payouts on the Razorpay dashboard for non-INR currencies to clear.
  */
 import { resolveGateway, getCountryConfig, DEFAULT_COUNTRY_CODE, COUNTRY_CONFIG } from '../../../config/country.config.js';
 import { RazorpayGateway } from './razorpay.gateway.js';
@@ -58,9 +62,9 @@ export class PaymentGatewayFactory {
       case 'stripe':
         return new StripeGateway({ currency: resolvedCurrency });
       default:
-        // Unknown gateway — log a warning and fall back to Stripe
-        // (xendit etc. can be added when those markets go live)
-        return new StripeGateway({ currency: resolvedCurrency });
+        // Unknown gateway (tabby/xendit/etc. not yet implemented) — fall back
+        // to Razorpay since it now serves every active country universally.
+        return new RazorpayGateway({ currency: resolvedCurrency });
     }
   }
 
