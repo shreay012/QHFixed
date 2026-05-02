@@ -34,12 +34,22 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
         }).filter(Boolean)
       : [t("default1"), t("default2"), t("default3"), t("default4")];
 
-  const promises = [
-    t("promise1"),
-    t("promise2"),
-    t("promise3"),
-    t("promise4"),
-  ];
+  // SERVICE_CMS_SECTIONS_V1 — admin can override the "What You Get" promises
+  // per service. Each entry is i18n-flattened by axios. Fall back to the
+  // 4 platform-default promises shipped in messages/{locale}.json.
+  const cmsPromises = Array.isArray(serviceData?.promises) ? serviceData.promises : [];
+  const promises = (cmsPromises.length > 0
+    ? cmsPromises.map((p) => (typeof p === 'string' ? tCms(p) : tCms(p) || '')).filter(Boolean)
+    : [t("promise1"), t("promise2"), t("promise3"), t("promise4")]);
+
+  // Working hours / Transparent Execution title + subtitle — single i18n
+  // strings on the service. Empty → fall back to the messages defaults.
+  const transparentTitle = tCms(serviceData?.transparentTitleI18n || serviceData?.transparentTitle)
+    || t("transparentTitle");
+  const transparentSubtitle = tCms(serviceData?.transparentSubtitleI18n || serviceData?.transparentSubtitle)
+    || t("transparentSubtitle");
+  const workingHours = tCms(serviceData?.workingHoursI18n || serviceData?.workingHours)
+    || t("workingHours");
 
   if (isLoading) {
     return (
@@ -141,7 +151,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
               mb: 2,
             }}
           >
-            {t("transparentTitle")}
+            {transparentTitle}
           </Typography>
           <Typography
             sx={{
@@ -151,7 +161,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
               mb: 4,
             }}
           >
-            {t("transparentSubtitle")}
+            {transparentSubtitle}
           </Typography>
 
           {/* Working Hours Badge */}
@@ -175,7 +185,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
                 color: "#1F2937",
               }}
             >
-              {t("workingHours")}
+              {workingHours}
             </Typography>
           </Box>
         </div>

@@ -3,21 +3,34 @@
 import React from "react";
 import { Box, Typography, Card } from "@mui/material";
 import { useTranslations } from "next-intl";
+import { useCmsTranslate } from "@/lib/i18n/useCmsTranslate";
 
 const BookingCard = ({ serviceData, isLoading }) => {
   const t = useTranslations("bookingCard");
-  // Receiving props for consistency, even if not using API data currently
+  const tCms = useCmsTranslate();
 
-  const firstRowSteps = [
-    { number: 1, title: t("step1Title"), description: t("step1Desc") },
-    { number: 2, title: t("step2Title"), description: t("step2Desc") },
+  // Platform default — same 5 steps shipped in messages/{locale}.json.
+  const defaultSteps = [
+    { title: t("step1Title"), description: t("step1Desc") },
+    { title: t("step2Title"), description: t("step2Desc") },
+    { title: t("step3Title"), description: t("step3Desc") },
+    { title: t("step4Title"), description: t("step4Desc") },
+    { title: t("step5Title"), description: t("step5Desc") },
   ];
 
-  const secondRowSteps = [
-    { number: 3, title: t("step3Title"), description: t("step3Desc") },
-    { number: 4, title: t("step4Title"), description: t("step4Desc") },
-    { number: 5, title: t("step5Title"), description: t("step5Desc") },
-  ];
+  // SERVICE_CMS_SECTIONS_V1 — admin can override the steps per service.
+  const cmsSteps = Array.isArray(serviceData?.processSteps) ? serviceData.processSteps : [];
+  const allSteps = (cmsSteps.length > 0
+    ? cmsSteps.map((s) => ({
+        title:       tCms(s?.titleI18n || s?.title) || "",
+        description: tCms(s?.descriptionI18n || s?.description) || "",
+      })).filter((s) => s.title)
+    : defaultSteps
+  ).map((s, i) => ({ ...s, number: i + 1 }));
+
+  // Render layout: first 2 in the wide grid, the rest in the 3-up row.
+  const firstRowSteps  = allSteps.slice(0, 2);
+  const secondRowSteps = allSteps.slice(2);
 
   return (
     <section

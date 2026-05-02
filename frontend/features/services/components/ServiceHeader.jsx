@@ -12,52 +12,44 @@ const ServiceHeader = ({ serviceData, isLoading }) => {
   // CMS string maps — so name/description update instantly when locale changes.
   const tCms = useCmsTranslate();
 
-  const features = [
-    {
-      icon: (
-        <Image
-          src="/images/book-services/service-icon1.svg"
-          alt="Verified"
-          width={24}
-          height={24}
-        />
-      ),
-      text: t("feature1"),
-    },
-    {
-      icon: (
-        <Image
-          src="/images/book-services/service-icon2.svg"
-          alt="Security"
-          width={24}
-          height={24}
-        />
-      ),
-      text: t("feature2"),
-    },
-    {
-      icon: (
-        <Image
-          src="/images/book-services/service-icon3.svg"
-          alt="Pricing"
-          width={24}
-          height={24}
-        />
-      ),
-      text: t("feature3"),
-    },
-    {
-      icon: (
-        <Image
-          src="/images/book-services/service-icon4.svg"
-          alt="Manager"
-          width={24}
-          height={24}
-        />
-      ),
-      text: t("feature4"),
-    },
+  // Platform-default 4 chips. Used when the service hasn't overridden them
+  // via the admin "Page Content" tab.
+  const defaultFeatures = [
+    { defaultIcon: "/images/book-services/service-icon1.svg", text: t("feature1"), alt: "Verified" },
+    { defaultIcon: "/images/book-services/service-icon2.svg", text: t("feature2"), alt: "Security" },
+    { defaultIcon: "/images/book-services/service-icon3.svg", text: t("feature3"), alt: "Pricing" },
+    { defaultIcon: "/images/book-services/service-icon4.svg", text: t("feature4"), alt: "Manager" },
   ];
+
+  // SERVICE_CMS_SECTIONS_V1 — admin can override the 4 chips per service.
+  // Each cms feature is { icon, label } — icon is optional (falls back to
+  // the corresponding platform SVG by index, or the first one if more chips
+  // were added than defaults).  Label is i18n-flattened by axios already.
+  const cmsFeatures = Array.isArray(serviceData?.features) ? serviceData.features : [];
+  const features = (cmsFeatures.length > 0
+    ? cmsFeatures.map((f, idx) => ({
+        text: tCms(f?.labelI18n || f?.label) || "",
+        icon: f?.icon
+          ? (
+              // Allow either a URL or an emoji/short string.
+              /^https?:\/\//.test(f.icon) || f.icon.startsWith("/")
+                ? <img src={f.icon} alt="" width={24} height={24} style={{ width: 24, height: 24, objectFit: "contain" }} />
+                : <span style={{ fontSize: 22, lineHeight: 1 }}>{f.icon}</span>
+            )
+          : (
+              <Image
+                src={defaultFeatures[idx % defaultFeatures.length].defaultIcon}
+                alt={defaultFeatures[idx % defaultFeatures.length].alt}
+                width={24}
+                height={24}
+              />
+            ),
+      }))
+    : defaultFeatures.map((f) => ({
+        text: f.text,
+        icon: <Image src={f.defaultIcon} alt={f.alt} width={24} height={24} />,
+      }))
+  ).filter((f) => f.text);
 
   return (
     <section

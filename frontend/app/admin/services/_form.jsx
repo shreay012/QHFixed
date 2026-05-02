@@ -65,10 +65,12 @@ const SERVICE_CATEGORIES = [
   'IT services',
 ];
 
-const TABS = ['Basic Info', 'Translations', 'Technologies & Scope', 'FAQs', 'Geo Pricing'];
+const TABS = ['Basic Info', 'Translations', 'Technologies & Scope', 'FAQs', 'Page Content', 'Geo Pricing'];
 
 const emptyLangMap = () => Object.fromEntries(LANG_CODES.map((c) => [c, '']));
 const emptyTech    = () => emptyLangMap();
+const emptyFeature      = () => ({ icon: '', label: emptyLangMap() });
+const emptyProcessStep  = () => ({ title: emptyLangMap(), description: emptyLangMap() });
 
 const emptyForm = () => ({
   name:         emptyLangMap(),
@@ -83,6 +85,15 @@ const emptyForm = () => ({
   hourlyRate:   '',
   imageUrl:     '',
   active:       true,
+  // SERVICE_CMS_SECTIONS_V1 — per-service overrides for the static
+  // service-details page sections. Empty arrays/maps mean "use platform
+  // defaults from messages/{locale}.json".
+  features:            [],
+  processSteps:        [],
+  promises:            [],
+  workingHours:        emptyLangMap(),
+  transparentTitle:    emptyLangMap(),
+  transparentSubtitle: emptyLangMap(),
 });
 
 // ─── Shared field helpers ─────────────────────────────────────────────────────
@@ -298,7 +309,7 @@ function FaqEditor({ faqs, onChange }) {
     <div className="space-y-3">
       {faqs.length === 0 && (
         <div className="text-center py-10 border-2 border-dashed border-[#C8E5C2] rounded-2xl text-sm text-[#909090]">
-          No FAQs added yet — the platform's default localized FAQs will be shown.
+          No FAQs added yet — the platform&apos;s default localized FAQs will be shown.
         </div>
       )}
       {faqs.map((faq, i) => (
@@ -406,6 +417,238 @@ function TechEditor({ technologies, onChange }) {
         className="w-full py-3 border-2 border-dashed border-[#45A735] text-[#45A735] text-sm font-bold rounded-2xl hover:bg-[#F7FBF6] transition-colors"
       >
         + Add Technology
+      </button>
+    </div>
+  );
+}
+
+// ─── I18nTextField ────────────────────────────────────────────────────────────
+// Compact editor for a single i18n string (e.g. workingHours). Shows the
+// English input inline and reveals the other locales behind a disclosure.
+
+function I18nTextField({ label, hint, value, onChange, placeholder, multiline = false }) {
+  const [open, setOpen] = useState(false);
+  const update = (code, val) => onChange({ ...value, [code]: val });
+  const Tag = multiline ? Textarea : Input;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>{label}</Label>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-[10px] font-bold text-[#45A735] hover:underline uppercase tracking-wider"
+        >
+          {open ? 'Hide translations ▲' : 'Translations ▼'}
+        </button>
+      </div>
+      <Tag
+        value={value?.en || ''}
+        onChange={(v) => update('en', v)}
+        placeholder={placeholder}
+        rows={multiline ? 2 : undefined}
+      />
+      {hint && <p className="text-xs text-[#909090]">{hint}</p>}
+      {open && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#E5F1E2]">
+          {LANGUAGES.filter((l) => l.code !== 'en').map(({ code, label: langLabel }) => (
+            <div key={code}>
+              <label className="block text-[10px] font-bold text-[#636363] uppercase tracking-wider mb-1.5">
+                {langLabel}
+              </label>
+              {multiline ? (
+                <Textarea
+                  value={value?.[code] || ''}
+                  onChange={(v) => update(code, v)}
+                  placeholder={`In ${langLabel}…`}
+                  rows={2}
+                />
+              ) : (
+                <Input
+                  value={value?.[code] || ''}
+                  onChange={(v) => update(code, v)}
+                  placeholder={`In ${langLabel}…`}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── FeatureEditor ────────────────────────────────────────────────────────────
+// Each feature = { icon: 'url-or-emoji', label: i18n }. Icons are optional;
+// when empty the customer-facing component falls back to its default SVG.
+
+function FeatureItem({ feature, index, onChange, onRemove }) {
+  const [open, setOpen] = useState(!feature.label?.en);
+  const updateLabel = (code, val) => onChange({ ...feature, label: { ...feature.label, [code]: val } });
+
+  return (
+    <div className="border border-[#E5F1E2] rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 bg-[#F7FBF6]">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-6 h-6 rounded-full bg-[#45A735] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+            {index + 1}
+          </span>
+          <span className="text-sm font-open-sauce-semibold text-[#26472B] truncate">
+            {feature.label?.en || <span className="text-[#909090] italic font-normal">Enter English label…</span>}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs font-semibold text-[#45A735] hover:underline">
+            {open ? 'Collapse ▲' : 'Edit ▼'}
+          </button>
+          <button type="button" onClick={onRemove} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+        </div>
+      </div>
+      {open && (
+        <div className="px-5 py-5 space-y-4">
+          <div>
+            <Label>Icon URL or Emoji <span className="text-[#909090] normal-case font-normal">— optional</span></Label>
+            <Input
+              value={feature.icon || ''}
+              onChange={(v) => onChange({ ...feature, icon: v })}
+              placeholder="https://cdn.example.com/icon.svg or 🚀"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {LANGUAGES.map(({ code, label: langLabel }) => (
+              <div key={code}>
+                <label className="block text-[10px] font-bold text-[#636363] uppercase tracking-wider mb-1.5">
+                  {langLabel}
+                  {code === 'en' && <span className="text-red-400 ml-1">*</span>}
+                </label>
+                <Input
+                  value={feature.label?.[code] || ''}
+                  onChange={(v) => updateLabel(code, v)}
+                  placeholder={code === 'en' ? 'e.g. 400+ Verified professionals' : `In ${langLabel}…`}
+                  className={code === 'en' && !feature.label?.en ? 'border-red-200' : ''}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeatureEditor({ features, onChange }) {
+  return (
+    <div className="space-y-3">
+      {features.length === 0 && (
+        <div className="text-center py-10 border-2 border-dashed border-[#C8E5C2] rounded-2xl text-sm text-[#909090]">
+          No features added — the platform&apos;s default 4 chips will be shown.
+        </div>
+      )}
+      {features.map((feature, i) => (
+        <FeatureItem
+          key={i}
+          index={i}
+          feature={feature}
+          onChange={(val) => onChange(features.map((f, idx) => (idx === i ? val : f)))}
+          onRemove={() => onChange(features.filter((_, idx) => idx !== i))}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...features, emptyFeature()])}
+        className="w-full py-3 border-2 border-dashed border-[#45A735] text-[#45A735] text-sm font-bold rounded-2xl hover:bg-[#F7FBF6] transition-colors"
+      >
+        + Add Feature Chip
+      </button>
+    </div>
+  );
+}
+
+// ─── ProcessStepEditor ────────────────────────────────────────────────────────
+// Each step = { title: i18n, description: i18n }. The step number is rendered
+// automatically in display order.
+
+function ProcessStepItem({ step, index, onChange, onRemove }) {
+  const [open, setOpen] = useState(!step.title?.en);
+  const updateField = (field, code, val) =>
+    onChange({ ...step, [field]: { ...step[field], [code]: val } });
+
+  return (
+    <div className="border border-[#E5F1E2] rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 bg-[#F7FBF6]">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-6 h-6 rounded-full bg-[#45A735] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+            {index + 1}
+          </span>
+          <span className="text-sm font-open-sauce-semibold text-[#26472B] truncate">
+            {step.title?.en || <span className="text-[#909090] italic font-normal">Enter step title…</span>}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs font-semibold text-[#45A735] hover:underline">
+            {open ? 'Collapse ▲' : 'Edit ▼'}
+          </button>
+          <button type="button" onClick={onRemove} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+        </div>
+      </div>
+      {open && (
+        <div className="px-5 py-5 space-y-5">
+          {LANGUAGES.map(({ code, label: langLabel }) => (
+            <div key={code} className="border-l-2 border-[#E5F1E2] pl-4 space-y-2">
+              <p className="text-[10px] font-bold text-[#636363] uppercase tracking-wider">
+                {langLabel}
+                {code === 'en' && <span className="text-red-400 ml-1">*</span>}
+              </p>
+              <div>
+                <Label>Title ({code})</Label>
+                <Input
+                  value={step.title?.[code] || ''}
+                  onChange={(v) => updateField('title', code, v)}
+                  placeholder={code === 'en' ? 'e.g. Booking' : `Title in ${langLabel}…`}
+                  className={code === 'en' && !step.title?.en ? 'border-red-200' : ''}
+                />
+              </div>
+              <div>
+                <Label>Description ({code})</Label>
+                <Textarea
+                  value={step.description?.[code] || ''}
+                  onChange={(v) => updateField('description', code, v)}
+                  placeholder={code === 'en' ? 'What happens in this step.' : `Description in ${langLabel}…`}
+                  rows={2}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProcessStepEditor({ steps, onChange }) {
+  return (
+    <div className="space-y-3">
+      {steps.length === 0 && (
+        <div className="text-center py-10 border-2 border-dashed border-[#C8E5C2] rounded-2xl text-sm text-[#909090]">
+          No process steps added — the platform&apos;s default 5-step flow will be shown.
+        </div>
+      )}
+      {steps.map((step, i) => (
+        <ProcessStepItem
+          key={i}
+          index={i}
+          step={step}
+          onChange={(val) => onChange(steps.map((s, idx) => (idx === i ? val : s)))}
+          onRemove={() => onChange(steps.filter((_, idx) => idx !== i))}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...steps, emptyProcessStep()])}
+        className="w-full py-3 border-2 border-dashed border-[#45A735] text-[#45A735] text-sm font-bold rounded-2xl hover:bg-[#F7FBF6] transition-colors"
+      >
+        + Add Process Step
       </button>
     </div>
   );
@@ -663,6 +906,28 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
         : { ...emptyLangMap(), en: typeof f.answer === 'string' ? f.answer : '' },
     }));
 
+    // ── CMS section hydrators ─────────────────────────────────────────────
+    // Each helper accepts whatever the backend currently has (string, sparse
+    // i18n object, or missing) and returns a full lang-map ready for editing.
+    const langMapFrom = (raw) => {
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        return { ...emptyLangMap(), ...raw };
+      }
+      return { ...emptyLangMap(), en: typeof raw === 'string' ? raw : '' };
+    };
+
+    const features = (initialData.features || []).map((f) => ({
+      icon:  typeof f?.icon === 'string' ? f.icon : '',
+      label: langMapFrom(f?.label),
+    }));
+
+    const processSteps = (initialData.processSteps || []).map((s) => ({
+      title:       langMapFrom(s?.title),
+      description: langMapFrom(s?.description),
+    }));
+
+    const promises = (initialData.promises || []).map((p) => langMapFrom(p));
+
     setForm({
       name:         nameMap,
       description:  descMap,
@@ -674,6 +939,12 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
       hourlyRate:   String(initialData.hourlyRate ?? initialData.pricing?.hourly ?? ''),
       imageUrl:     initialData.imageUrl || initialData.image || '',
       active:       initialData.active !== false,
+      features,
+      processSteps,
+      promises,
+      workingHours:        langMapFrom(initialData.workingHours),
+      transparentTitle:    langMapFrom(initialData.transparentTitle),
+      transparentSubtitle: langMapFrom(initialData.transparentSubtitle),
     });
   }, [initialData]);
 
@@ -732,6 +1003,30 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
           ),
         }));
 
+      // ── CMS section serializers ────────────────────────────────────────
+      // Strip empty locale entries from a lang-map and only ship the field
+      // when at least one locale has content. The customer-facing
+      // flattenI18nDeep then localises to the active language at read time.
+      const sparseI18n = (m) => Object.fromEntries(
+        LANG_CODES.map((c) => [c, m?.[c]?.trim() || '']).filter(([, v]) => v),
+      );
+      const i18nOrEmpty = (m) => {
+        const o = sparseI18n(m);
+        return Object.keys(o).length > 0 ? o : '';
+      };
+
+      const featuresI18n = form.features
+        .filter((f) => f.label?.en?.trim())
+        .map((f) => ({ icon: (f.icon || '').trim(), label: sparseI18n(f.label) }));
+
+      const processStepsI18n = form.processSteps
+        .filter((s) => s.title?.en?.trim() && s.description?.en?.trim())
+        .map((s) => ({ title: sparseI18n(s.title), description: sparseI18n(s.description) }));
+
+      const promisesI18n = form.promises
+        .filter((p) => p?.en?.trim())
+        .map((p) => sparseI18n(p));
+
       const body = {
         name:         nameI18n,
         category:     form.category || '',
@@ -746,6 +1041,14 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
         hourlyRate:   Number(form.hourlyRate) || 0,
         imageUrl:     form.imageUrl || '',
         active:       form.active,
+        // CMS sections — empty arrays/strings tell the backend to treat
+        // this service as "use platform defaults".
+        features:            featuresI18n,
+        processSteps:        processStepsI18n,
+        promises:            promisesI18n,
+        workingHours:        i18nOrEmpty(form.workingHours),
+        transparentTitle:    i18nOrEmpty(form.transparentTitle),
+        transparentSubtitle: i18nOrEmpty(form.transparentSubtitle),
       };
 
       let savedId = serviceId;
@@ -994,7 +1297,7 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
         {tab === 3 && (
           <SectionCard
             title="Frequently Asked Questions"
-            hint="These appear in the FAQ accordion at the bottom of the service page. Leave empty to show the platform's default static FAQs."
+            hint="These appear in the FAQ accordion at the bottom of the service page. Leave empty to show the platform&apos;s default static FAQs."
           >
             <FaqEditor
               faqs={form.faqs}
@@ -1003,8 +1306,69 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
           </SectionCard>
         )}
 
-        {/* Tab 4 — Geo Pricing */}
+        {/* Tab 4 — Page Content (per-service overrides for the
+            customer-facing /service-details page) */}
         {tab === 4 && (
+          <>
+            <SectionCard
+              title="Hero Feature Chips"
+              hint='The 4 chips next to the hero ("400+ Verified professionals", "Enterprise-grade security", …). Leave empty to use the platform defaults from messages files.'
+            >
+              <FeatureEditor
+                features={form.features}
+                onChange={(val) => setForm({ ...form, features: val })}
+              />
+            </SectionCard>
+
+            <SectionCard
+              title="How It Works — Process Steps"
+              hint='The numbered cards under "See How QuickHire Can help you". Leave empty to show the default 5 platform steps.'
+            >
+              <ProcessStepEditor
+                steps={form.processSteps}
+                onChange={(val) => setForm({ ...form, processSteps: val })}
+              />
+            </SectionCard>
+
+            <SectionCard
+              title='"What You Get" Promises'
+              hint='The green-bordered "What You Get" box on the service page. Leave empty to show the 4 default promises.'
+            >
+              <LocalizedListEditor
+                items={form.promises}
+                onChange={(val) => setForm({ ...form, promises: val })}
+                placeholder="e.g. Verified professionals assigned to your task"
+                addLabel="+ Add Promise"
+              />
+            </SectionCard>
+
+            <SectionCard title="Transparent Execution Section" hint="Title + subtitle above the working-hours badge.">
+              <I18nTextField
+                label="Title"
+                value={form.transparentTitle}
+                onChange={(val) => setForm({ ...form, transparentTitle: val })}
+                placeholder="e.g. Transparent Execution"
+              />
+              <I18nTextField
+                label="Subtitle"
+                value={form.transparentSubtitle}
+                onChange={(val) => setForm({ ...form, transparentSubtitle: val })}
+                placeholder="e.g. Transparency built into every stage of execution."
+                multiline
+              />
+              <I18nTextField
+                label="Working Hours Badge"
+                value={form.workingHours}
+                onChange={(val) => setForm({ ...form, workingHours: val })}
+                placeholder="e.g. Monday–Friday • 9 AM – 6 PM IST"
+                hint="Leave empty to show the platform default."
+              />
+            </SectionCard>
+          </>
+        )}
+
+        {/* Tab 5 — Geo Pricing */}
+        {tab === 5 && (
           <SectionCard
             title="Country-Specific Pricing"
             hint="Override the base INR hourly rate for specific countries and currencies."

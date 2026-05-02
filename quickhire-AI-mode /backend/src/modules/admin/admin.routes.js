@@ -351,6 +351,23 @@ const serviceSchema = z.object({
     question: I18nStringSchema,
     answer:   I18nStringSchema,
   })).optional().default([]),
+  // SERVICE_CMS_SECTIONS_V1: per-service overrides for the static sections of
+  // the customer-facing /service-details page. All optional — if a service
+  // leaves them empty the components fall back to the platform defaults
+  // shipped in messages/{locale}.json. Each text field is i18n-shaped so
+  // translations live alongside name/description/tagline.
+  features: z.array(z.object({
+    icon:  z.string().optional().default(''),  // optional URL or emoji
+    label: I18nStringSchema,
+  })).optional().default([]),
+  processSteps: z.array(z.object({
+    title:       I18nStringSchema,
+    description: I18nStringSchema,
+  })).optional().default([]),
+  promises:     z.array(I18nStringSchema).optional().default([]),
+  workingHours: I18nStringSchema.optional().default(''),
+  transparentTitle:    I18nStringSchema.optional().default(''),
+  transparentSubtitle: I18nStringSchema.optional().default(''),
   active:       z.boolean().optional(),
   availability: z.record(z.unknown()).optional(),
 });
@@ -396,6 +413,14 @@ r.post('/services', permGuard(PERMS.SERVICE_WRITE), validate(serviceSchema), asy
     imageUrl:     body.imageUrl || '',
     image:        body.imageUrl || '',
     faqs:         body.faqs || [],
+    // CMS sections — persist exactly what admin sent so customer-facing
+    // flattenI18nDeep can pick the right locale at read time.
+    features:            body.features            || [],
+    processSteps:        body.processSteps        || [],
+    promises:            body.promises            || [],
+    workingHours:        body.workingHours        || '',
+    transparentTitle:    body.transparentTitle    || '',
+    transparentSubtitle: body.transparentSubtitle || '',
     availability: body.availability || {},
     active:       body.active !== undefined ? body.active : true,
     createdAt:    new Date(),
@@ -425,6 +450,13 @@ r.put('/services/:id', permGuard(PERMS.SERVICE_WRITE), validate(serviceSchema.pa
   }
   if (body.imageUrl !== undefined) { $set.imageUrl = body.imageUrl; $set.image = body.imageUrl; }
   if (body.faqs     !== undefined) $set.faqs     = body.faqs;
+  // CMS sections (per-service overrides for the static service-details page)
+  if (body.features            !== undefined) $set.features            = body.features;
+  if (body.processSteps        !== undefined) $set.processSteps        = body.processSteps;
+  if (body.promises            !== undefined) $set.promises            = body.promises;
+  if (body.workingHours        !== undefined) $set.workingHours        = body.workingHours;
+  if (body.transparentTitle    !== undefined) $set.transparentTitle    = body.transparentTitle;
+  if (body.transparentSubtitle !== undefined) $set.transparentSubtitle = body.transparentSubtitle;
   if (body.active   !== undefined) $set.active   = body.active;
   if (body.availability !== undefined) $set.availability = body.availability;
   await servicesCol().updateOne({ _id: id }, { $set });
