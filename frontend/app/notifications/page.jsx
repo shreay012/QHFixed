@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { notificationsService } from "@/lib/services/notificationsApi";
 import chatSocketService from "@/lib/services/chatSocketService";
+import {
+  resolveNotificationRoute,
+  readCurrentRole,
+} from "@/lib/utils/notificationRoute";
 import { useTranslations } from "next-intl";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +41,7 @@ function normalize(n) {
 
 export default function NotificationsPage() {
   const t = useTranslations("notifications");
+  const router = useRouter();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -88,6 +94,19 @@ export default function NotificationsPage() {
       await notificationsService.deleteNotification(id);
     } catch (e) {
       console.error("Failed to mark notification read", e);
+    }
+  };
+
+  // Click on a notification → mark read (if unread) AND deep-link to the
+  // related entity. Without this the user has no way to reach the booking,
+  // chat, or payment that the notification was actually about.
+  const handleOpenNotification = (notification) => {
+    if (!notification.read) {
+      handleMarkAsRead(notification.id);
+    }
+    const target = resolveNotificationRoute(notification.raw, readCurrentRole());
+    if (target) {
+      router.push(target);
     }
   };
 
@@ -161,10 +180,18 @@ export default function NotificationsPage() {
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
+                  role="button"
+                  tabIndex={0}
                   className={`p-6 hover:bg-gray-50 transition-colors cursor-pointer ${
                     !notification.read ? "bg-blue-50/50" : ""
                   }`}
-                  onClick={() => !notification.read && handleMarkAsRead(notification.id)}
+                  onClick={() => handleOpenNotification(notification)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleOpenNotification(notification);
+                    }
+                  }}
                 >
                   <div className="flex gap-4">
                     <div className="flex-shrink-0">
