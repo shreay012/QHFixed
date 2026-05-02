@@ -1,20 +1,41 @@
 'use client';
-import { showError, showSuccess } from '@/lib/utils/toast';
+import { showError } from '@/lib/utils/toast';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import staffApi from '@/lib/axios/staffApi';
 import { s } from '@/lib/utils/i18nText';
-import { PageHeader, Table, StatusBadge, Spinner, ErrorBox, Button } from '@/components/staff/ui';
+import {
+  PageHeader,
+  Table,
+  StatusBadge,
+  Spinner,
+  ErrorBox,
+  Button,
+  SearchInput,
+  Select,
+  Pagination,
+  SectionCard,
+} from '@/components/staff/ui';
+
+const PAGE_SIZE = 20;
+const STATUS_TABS = [
+  { key: '',             label: 'All' },
+  { key: 'assigned_to_pm', label: 'Assigned' },
+  { key: 'in_progress',  label: 'In progress' },
+  { key: 'paused',       label: 'Paused' },
+  { key: 'completed',    label: 'Completed' },
+  { key: 'cancelled',    label: 'Cancelled' },
+];
 
 function formatDuration(ms) {
   if (!ms || ms < 0) ms = 0;
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  const ss = totalSec % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
 function liveWorked(row, tick) {
@@ -28,28 +49,57 @@ function liveWorked(row, tick) {
 export default function PmBookingsPage() {
   const t = useTranslations('pm.bookings');
   const router = useRouter();
+
+  // Filter / pagination state — drives the GET /pm/bookings query string.
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState('');
+  const [q, setQ] = useState('');
+
+  // Data state
   const [items, setItems] = useState(null);
+  const [meta, setMeta] = useState({ total: 0, totalPages: 1 });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState({});
+
+  // Live ticker state — only ticks while at least one row is in_progress,
+  // and only on the rows currently rendered (max PAGE_SIZE), so the cost is
+  // bounded regardless of how many bookings the PM owns globally.
   const [tick, setTick] = useState(Date.now());
   const tickRef = useRef(null);
 
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(PAGE_SIZE));
+    if (status) params.set('status', status);
+    if (q.trim()) params.set('q', q.trim());
+    return params.toString();
+  }, [page, status, q]);
+
   const load = useCallback(() => {
     setError(null);
-    staffApi.get('/pm/bookings')
-      .then((r) => setItems(r.data?.data || []))
-      .catch(setError);
-  }, []);
+    staffApi.get(`/pm/bookings?${queryString}`)
+      .then((r) => {
+        setItems(r.data?.data || []);
+        setMeta(r.data?.meta || { total: 0, totalPages: 1 });
+      })
+      .catch((e) => setError(e?.response?.data?.error?.message || 'Failed to load bookings'));
+  }, [queryString]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Live ticker for in-progress timers.
+  // Reset page when search / status changes (debounced search resets too).
+  useEffect(() => { setPage(1); }, [status, q]);
+
+  // Live tick only while at least one *visible* row is in_progress. With
+  // pagination (max PAGE_SIZE rows), this stays cheap even for a PM with
+  // thousands of total bookings — the previous unconditional 1s tick over
+  // the entire fleet would burn the browser at scale.
   useEffect(() => {
     const hasActive = (items || []).some((j) => j.status === 'in_progress');
-    if (hasActive) {
-      tickRef.current = setInterval(() => setTick(Date.now()), 1000);
-      return () => clearInterval(tickRef.current);
-    }
+    if (!hasActive) return;
+    tickRef.current = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(tickRef.current);
   }, [items]);
 
   const action = async (id, kind) => {
@@ -124,9 +174,37 @@ export default function PmBookingsPage() {
     <div>
       <PageHeader title={t('title')} subtitle={t('subtitle')} />
       <div className="p-4 sm:p-8 space-y-4">
+        <SectionCard title="Filters">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <SearchInput
+              value={q}
+              onChange={setQ}
+              placeholder="Search by customer, mobile, email or booking ID"
+            />
+            <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+              {STATUS_TABS.map((tab) => (
+                <option key={tab.key || 'all'} value={tab.key}>{tab.label}</option>
+              ))}
+            </Select>
+            <div className="flex items-end text-xs text-[#909090]">
+              {meta.total != null && `${meta.total} booking${meta.total === 1 ? '' : 's'} match`}
+            </div>
+          </div>
+        </SectionCard>
+
         <ErrorBox error={error} />
         {items === null && !error && <Spinner />}
-        {items !== null && <Table columns={columns} rows={items} empty={t('noResults')} />}
+        {items !== null && (
+          <>
+            <Table columns={columns} rows={items} empty={t('noResults')} />
+            <Pagination
+              page={page}
+              total={meta.total || 0}
+              pageSize={PAGE_SIZE}
+              onChange={setPage}
+            />
+          </>
+        )}
       </div>
     </div>
   );

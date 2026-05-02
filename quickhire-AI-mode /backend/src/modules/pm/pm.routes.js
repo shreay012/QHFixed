@@ -87,6 +87,29 @@ r.get('/bookings', asyncHandler(async (req, res) => {
   const p = paginate(req.query);
   const filter = { pmId: new ObjectId(req.user.id) };
   if (req.query.status) filter.status = String(req.query.status);
+
+  // Free-text search across the bookingId tail, raw mongo _id, customer
+  // name, customer mobile, and customer email so a PM can find a single
+  // booking out of thousands without paging through them. Supplied as
+  // ?q=… by the frontend; missing → no extra filter applied.
+  const q = String(req.query.q || '').trim();
+  if (q) {
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(safe, 'i');
+    const orParts = [
+      { customerName: re },
+      { customerMobile: re },
+      { customerEmail: re },
+    ];
+    if (/^[0-9a-f]{24}$/i.test(q)) {
+      try { orParts.push({ _id: new ObjectId(q) }); } catch { /* ignore */ }
+    } else if (/^[0-9a-f]{4,23}$/i.test(q)) {
+      // Partial id — match anywhere in the hex string of _id
+      orParts.push({ $expr: { $regexMatch: { input: { $toString: '$_id' }, regex: re } } });
+    }
+    filter.$or = orParts;
+  }
+
   const [items, total] = await Promise.all([
     jobsCol().find(filter).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
     jobsCol().countDocuments(filter),
