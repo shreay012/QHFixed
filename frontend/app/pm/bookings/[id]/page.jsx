@@ -80,41 +80,56 @@ export default function PmBookingDetailPage() {
     }
   }, [job?.status]);
 
-  // Real-time chat via socket (with 10s polling as fallback)
+  // Real-time chat via socket. Backend convention (chat.service.js):
+  //   • Broadcasts `new-message` to room `booking_<bookingId>`
+  //   • Direct-pushes `message:new` to every participant's `user_<uid>` room
+  // The PM is auto-joined to their `user_<pmId>` room on socket auth, so the
+  // direct push fires regardless — but we ALSO join `booking_<id>` so the
+  // canonical room broadcast is delivered (covers the rare case where the
+  // backend's user-room fan-out skipped someone). Then we filter every
+  // incoming message by bookingId so a PM viewing one booking never sees
+  // bubbles from another booking they also manage.
   useEffect(() => {
-    // Socket: listen for new messages in this room
     const sock = chatSocketService.socket;
-    const roomId = job?.customerId ? `${id}_service_${job?.services?.[0]?.serviceId || id}` : null;
+    const bookingRoom = id ? `booking_${id}` : null;
 
     const onMessage = (msg) => {
       if (!msg) return;
+      // Bookings room → only fires for this booking, but message:new fan-out
+      // arrives for every booking the PM is part of. Filter so the right
+      // bubbles render in the right pane.
+      const msgBookingId = String(msg.bookingId || msg.roomId?.replace(/^booking_/, '') || '');
+      if (msgBookingId && msgBookingId !== String(id)) return;
       setMessages(prev => {
-        // Deduplicate by _id
-        const exists = prev.some(m => String(m._id) === String(msg._id || msg.id));
+        const incomingId = String(msg._id || msg.id || msg.tempId || '');
+        const exists = prev.some(m => String(m._id || m.id || m.tempId) === incomingId);
         return exists ? prev : [...prev, msg];
       });
     };
 
     if (sock) {
-      // Join the booking chat room
-      if (roomId) sock.emit('join-room', roomId);
-      sock.on('new-message', onMessage);
-      sock.on('new_message', onMessage);
-      sock.on('message', onMessage);
+      if (bookingRoom) {
+        // Server accepts both event names; emit the canonical one.
+        sock.emit('chat:join', { roomId: bookingRoom });
+      }
+      sock.on('new-message', onMessage); // room broadcast
+      sock.on('message:new', onMessage); // direct user-room push
     }
 
-    // Fallback polling at 10s (reduced from 5s since socket handles real-time)
-    pollRef.current = setInterval(loadMessages, 10000);
+    // Polling fallback in case the socket is briefly disconnected. Cadence
+    // bumped to 30s — the socket is the primary path now, polling is just a
+    // safety net so a 5K-resource fleet doesn't hammer the chat API.
+    pollRef.current = setInterval(loadMessages, 30000);
 
     return () => {
       if (sock) {
+        if (bookingRoom) sock.emit('chat:leave', { roomId: bookingRoom });
         sock.off('new-message', onMessage);
-        sock.off('new_message', onMessage);
-        sock.off('message', onMessage);
+        sock.off('message:new', onMessage);
       }
       clearInterval(pollRef.current);
     };
-  }, [id, loadMessages, job?.customerId, job?.services]);
+  }, [id, loadMessages]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
