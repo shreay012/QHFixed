@@ -136,6 +136,131 @@ r.get('/bookings/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, data: hydrated });
 }));
 
+/* ══════════════════════════════════════════════════════════════════════
+   PAYMENTS — admin transaction explorer
+   - GET /admin/payments               list with filters + pagination
+   - GET /admin/payments/stats         aggregated KPIs across all currencies
+   - GET /admin/payments/:id           single transaction detail (hydrated)
+   Filters: status, country, currency, gateway, q (paymentId/orderId/email),
+            from, to (ISO dates), userId, jobId
+══════════════════════════════════════════════════════════════════════ */
+
+async function hydratePayments(payments) {
+  if (!payments.length) return [];
+  const userIds = new Set();
+  const jobIds  = new Set();
+  for (const p of payments) {
+    if (p.userId) userIds.add(String(p.userId));
+    if (p.jobId)  jobIds.add(String(p.jobId));
+  }
+  const toOid = (x) => { try { return new ObjectId(String(x)); } catch { return null; } };
+  const [users, jobs] = await Promise.all([
+    userIds.size
+      ? usersCol().find({ _id: { $in: [...userIds].map(toOid).filter(Boolean) } })
+          .project({ name: 1, mobile: 1, email: 1 })
+          .toArray()
+      : [],
+    jobIds.size
+      ? jobsCol().find({ _id: { $in: [...jobIds].map(toOid).filter(Boolean) } })
+          .project({ title: 1, status: 1, services: 1, pricing: 1 })
+          .toArray()
+      : [],
+  ]);
+  const uMap = new Map(users.map((u) => [String(u._id), u]));
+  const jMap = new Map(jobs.map((j) => [String(j._id), j]));
+  return payments.map((p) => {
+    const u = uMap.get(String(p.userId));
+    const j = jMap.get(String(p.jobId));
+    return {
+      ...p,
+      customerName:   u?.name   || '',
+      customerMobile: u?.mobile || '',
+      customerEmail:  u?.email  || '',
+      jobStatus:      j?.status || '',
+      jobTitle:       j?.title  || '',
+    };
+  });
+}
+
+r.get('/payments', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) => {
+  const { status, country, currency, gateway, q, from, to, userId, jobId,
+          page = 1, limit = 20, pageSize } = req.query;
+  const lim = Math.min(Number(pageSize || limit) || 20, 100);
+  const pg  = Number(page) || 1;
+
+  const filter = {};
+  if (status)   filter.status   = String(status);
+  if (country)  filter.country  = String(country).toUpperCase();
+  if (currency) filter.currency = String(currency).toUpperCase();
+  if (gateway)  filter.provider = String(gateway).toLowerCase();
+  if (userId) { try { filter.userId = new ObjectId(String(userId)); } catch {} }
+  if (jobId)  { try { filter.jobId  = new ObjectId(String(jobId));  } catch {} }
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = new Date(String(from));
+    if (to)   filter.createdAt.$lte = new Date(String(to));
+  }
+  if (q) {
+    const needle = String(q).trim();
+    filter.$or = [
+      { paymentId: needle },
+      { orderId:   needle },
+      // partial match for payment IDs (Razorpay/Stripe IDs are short enough)
+      { paymentId: { $regex: needle, $options: 'i' } },
+      { orderId:   { $regex: needle, $options: 'i' } },
+    ];
+  }
+
+  const [raw, total] = await Promise.all([
+    paymentsCol().find(filter).sort({ createdAt: -1 }).skip((pg - 1) * lim).limit(lim).toArray(),
+    paymentsCol().countDocuments(filter),
+  ]);
+  const payments = await hydratePayments(raw);
+  res.json({ success: true, data: { payments, total, page: pg, limit: lim } });
+}));
+
+r.get('/payments/stats', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (_req, res) => {
+  // KPIs grouped per currency so the dashboard can show "₹4.5M paid /
+  // €12k paid / $3.2k paid" side by side instead of mixing currencies.
+  const [byStatus, byCurrency, mockCount, gatewayBreakdown] = await Promise.all([
+    paymentsCol().aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]).toArray(),
+    paymentsCol().aggregate([
+      { $match: { status: 'paid' } },
+      { $group: { _id: '$currency', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]).toArray(),
+    paymentsCol().countDocuments({ mock: true }),
+    paymentsCol().aggregate([
+      { $group: { _id: '$provider', count: { $sum: 1 }, total: { $sum: '$amount' } } },
+    ]).toArray(),
+  ]);
+  res.json({
+    success: true,
+    data: {
+      countsByStatus:   Object.fromEntries(byStatus.map((s) => [s._id || 'unknown', s.count])),
+      paidByCurrency:   byCurrency.map((c) => ({ currency: c._id || 'INR', total: c.total, count: c.count })),
+      mockPayments:     mockCount,
+      gatewayBreakdown: gatewayBreakdown.map((g) => ({ gateway: g._id || 'unknown', count: g.count, total: g.total })),
+    },
+  });
+}));
+
+r.get('/payments/:id', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) => {
+  let payment = null;
+  try { payment = await paymentsCol().findOne({ _id: new ObjectId(req.params.id) }); } catch {}
+  if (!payment) {
+    // Fallback: support lookup by Razorpay/Stripe paymentId or orderId so the
+    // admin can paste a `pay_xxx` / `order_xxx` directly into the URL.
+    payment = await paymentsCol().findOne({
+      $or: [{ paymentId: req.params.id }, { orderId: req.params.id }],
+    });
+  }
+  if (!payment) throw new AppError('RESOURCE_NOT_FOUND', 'Payment not found', 404);
+  const [hydrated] = await hydratePayments([payment]);
+  res.json({ success: true, data: hydrated });
+}));
+
 r.patch('/bookings/:id/confirm', permGuard(PERMS.BOOKING_WRITE), asyncHandler(async (req, res) => {
   const id = toObjectId(req.params.id);
   await jobsCol().updateOne({ _id: id }, { $set: { status: 'confirmed', updatedAt: new Date() } });
