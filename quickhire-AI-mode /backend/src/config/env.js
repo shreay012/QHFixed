@@ -51,6 +51,25 @@ const schema = z.object({
   // Dev-only: if set, this OTP is always accepted (skip Redis/bcrypt check).
   // Should be empty/unset in production.
   DEV_MASTER_OTP: z.string().optional(),
+
+  // Company / supplier details printed on every invoice. All optional —
+  // missing fields just render as blank in the PDF. Per-country tax
+  // registration numbers are picked up by lib/invoice/renderInvoicePdf.js
+  // based on the payment's `country` field.
+  COMPANY_NAME:           z.string().optional(),
+  COMPANY_ADDRESS_LINE1:  z.string().optional(),
+  COMPANY_ADDRESS_LINE2:  z.string().optional(),
+  COMPANY_EMAIL:          z.string().optional(),
+  COMPANY_PHONE:          z.string().optional(),
+  COMPANY_LEGAL_FOOTER:   z.string().optional(),
+  COMPANY_GSTIN:          z.string().optional(),  // India
+  COMPANY_TRN:            z.string().optional(),  // UAE
+  COMPANY_USTID:          z.string().optional(),  // Germany
+  COMPANY_VAT_GB:         z.string().optional(),  // UK
+  COMPANY_VAT_SA:         z.string().optional(),  // Saudi Arabia
+  COMPANY_UEN:            z.string().optional(),  // Singapore
+  COMPANY_EIN:            z.string().optional(),  // United States
+  COMPANY_ABN:            z.string().optional(),  // Australia
 });
 
 const parsed = schema.safeParse(process.env);

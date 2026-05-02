@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import PDFDocument from 'pdfkit';
 import { ObjectId } from 'mongodb';
 import { ReceiveMessageCommand, DeleteMessageCommand } from '@aws-sdk/client-sqs';
 import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -8,32 +7,22 @@ import { sqs, s3 } from '../config/aws.js';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { connectDb, closeDb, getDb } from '../config/db.js';
+import { renderInvoicePdf } from '../lib/invoice/renderInvoicePdf.js';
 
 async function generate({ paymentId, jobId }) {
   const db = getDb();
   const payment = await db.collection('payments').findOne({ paymentId });
   if (!payment) throw new Error('payment not found');
-  const job = await db.collection('jobs').findOne({ _id: new ObjectId(jobId) });
+  const job = jobId ? await db.collection('jobs').findOne({ _id: new ObjectId(jobId) }) : null;
 
-  const buffers = [];
-  const doc = new PDFDocument({ size: 'A4', margin: 50 });
-  doc.on('data', (b) => buffers.push(b));
-  const done = new Promise((resolve) => doc.on('end', resolve));
+  // Country-aware render (locale, currency, tax label, registration number)
+  // — the same template the sync /invoice/download route uses, so a user
+  // who downloads before the worker finishes still gets an identical PDF.
+  const buffer = await renderInvoicePdf({ payment, job });
 
-  doc.fontSize(20).text('QuickHire — Tax Invoice', { align: 'center' });
-  doc.moveDown();
-  doc.fontSize(12).text(`Invoice for payment ${paymentId}`);
-  doc.text(`Order ID: ${payment.orderId}`);
-  doc.text(`Date: ${new Date(payment.updatedAt).toLocaleString()}`);
-  doc.moveDown();
-  doc.text(`Job: ${job?.title || jobId}`);
-  doc.text(`Amount: ₹${payment.amount.toFixed(2)} ${payment.currency}`);
-  doc.text(`Status: ${payment.status}`);
-  doc.end();
-  await done;
-
-  const buffer = Buffer.concat(buffers);
-  const key = `invoices/${payment.userId}/${jobId}.pdf`;
+  const userIdSeg = String(payment.userId || 'unknown');
+  const jobSeg    = String(jobId || payment.jobId || payment.paymentId || 'invoice');
+  const key = `invoices/${userIdSeg}/${jobSeg}.pdf`;
   await s3.send(new PutObjectCommand({
     Bucket: env.S3_BUCKET_INVOICES,
     Key: key,
@@ -45,11 +34,21 @@ async function generate({ paymentId, jobId }) {
     Bucket: env.S3_BUCKET_INVOICES, Key: key,
   }), { expiresIn: 7 * 24 * 60 * 60 });
 
+  // Preserve the existing invoice breakdown (subtotal/tax/total) and only
+  // attach the storage metadata. Overwriting the whole object would drop
+  // the country-specific tax line we computed at order-create time.
   await db.collection('payments').updateOne(
     { paymentId },
-    { $set: { invoice: { key, url, generatedAt: new Date() }, updatedAt: new Date() } },
+    {
+      $set: {
+        'invoice.key': key,
+        'invoice.url': url,
+        'invoice.generatedAt': new Date(),
+        updatedAt: new Date(),
+      },
+    },
   );
-  logger.info({ paymentId, key }, 'invoice generated');
+  logger.info({ paymentId, key, country: payment.country, currency: payment.currency }, 'invoice generated');
 }
 
 async function loop() {

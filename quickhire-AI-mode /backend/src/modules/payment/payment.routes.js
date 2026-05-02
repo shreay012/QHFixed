@@ -30,6 +30,7 @@ import { sqs } from '../../config/aws.js';
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
 import { PaymentGatewayFactory } from './gateways/gateway.factory.js';
 import { buildInvoiceBreakdown } from '../../config/country.config.js';
+import { renderInvoicePdf } from '../../lib/invoice/renderInvoicePdf.js';
 
 const r = Router();
 const col = () => getDb().collection('payments');
@@ -308,47 +309,29 @@ r.post('/invoice/download/:jobId', roleGuard(['user', 'admin']), asyncHandler(as
   const p = await col().findOne({ jobId: toObjectId(req.params.jobId, 'jobId'), status: 'paid' });
   if (!p) throw new AppError('RESOURCE_NOT_FOUND', 'No paid invoice for this job', 404);
 
-  // If the invoice was uploaded to S3, redirect
+  // If the async worker has already produced an S3 invoice, redirect there
   if (p.invoice?.url) {
     return res.json({ success: true, data: { url: p.invoice.url } });
   }
 
-  // Fallback: synthesize a minimal PDF (no external dep)
-  const currency = p.currency || 'INR';
-  const country = p.country || 'IN';
-  const tax = p.invoice?.tax || {};
-  const lines = [
-    `QuickHire Invoice`,
-    `Job: ${req.params.jobId}`,
-    `Country: ${country}`,
-    `Subtotal: ${currency} ${(p.invoice?.subtotal || p.amount)}`,
-    tax.name ? `${tax.name} (${(tax.rate * 100).toFixed(0)}%): ${currency} ${tax.amount}` : '',
-    `Total: ${currency} ${p.amount}`,
-    `Payment ID: ${p.paymentId || p.orderId}`,
-    `Status: ${p.status}`,
-  ].filter(Boolean);
+  // Otherwise render on-demand using the same country-aware template the
+  // worker uses — keeps every market's invoice consistent regardless of
+  // which delivery path served it. The job is loaded best-effort so we
+  // can populate line items; failure to load it just falls back to a
+  // single-line "Professional Services" row.
+  let job = null;
+  try {
+    job = await jobsCol().findOne({ _id: toObjectId(req.params.jobId, 'jobId') });
+  } catch { /* ignore — renderer handles missing job */ }
 
-  const stream = lines
-    .map((l, i) => `BT /F1 12 Tf 50 ${760 - i * 20} Td (${l.replace(/[()\\]/g, '')}) Tj ET`)
-    .join('\n');
+  let buf;
+  try {
+    buf = await renderInvoicePdf({ payment: p, job });
+  } catch (err) {
+    logger.error({ err, jobId: req.params.jobId }, 'inline invoice render failed');
+    throw new AppError('INVOICE_RENDER_FAILED', 'Failed to render invoice', 500);
+  }
 
-  const objs = [];
-  objs.push('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj');
-  objs.push('2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj');
-  objs.push('3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj');
-  const content = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
-  objs.push(`4 0 obj ${content} endobj`);
-  objs.push('5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj');
-
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  for (const o of objs) { offsets.push(Buffer.byteLength(pdf)); pdf += o + '\n'; }
-  const xrefStart = Buffer.byteLength(pdf);
-  pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i <= objs.length; i++) pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
-  pdf += `trailer << /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-
-  const buf = Buffer.from(pdf, 'binary');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=invoice_${req.params.jobId}.pdf`);
   return res.end(buf);
