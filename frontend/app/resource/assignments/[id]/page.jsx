@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import staffApi from '@/lib/axios/staffApi';
+import chatSocketService from '@/lib/services/chatSocketService';
 import { showError, showSuccess } from '@/lib/utils/toast';
 import { s } from '@/lib/utils/i18nText';
 import { PageHeader, StatusBadge, Spinner, ErrorBox, Button } from '@/components/staff/ui';
@@ -41,10 +42,56 @@ export default function ResourceAssignmentDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); loadMessages(); }, [load, loadMessages]);
+
+  // Real-time chat via socket. The backend (chat.service.js) broadcasts
+  // `new-message` to room `booking_<id>` and direct-pushes `message:new`
+  // to each participant's `user_<uid>` room. The resource is auto-joined
+  // to their `user_<resourceId>` room on socket auth, so the direct push
+  // fires regardless — but we ALSO join `booking_<id>` so the canonical
+  // room broadcast is delivered. With 5K active resources, the previous
+  // per-detail-page 5s poll would amplify into ~60K req/min on the chat
+  // collection; with socket-driven updates that drops to ~0.
   useEffect(() => {
-    pollRef.current = setInterval(loadMessages, 5000);
-    return () => clearInterval(pollRef.current);
-  }, [loadMessages]);
+    if (!id) return;
+    const sock = chatSocketService.socket;
+    const bookingRoom = `booking_${id}`;
+
+    const onMessage = (msg) => {
+      if (!msg) return;
+      // The user_<resourceId> push fires for every booking the resource
+      // is part of — filter so only this booking's messages show here.
+      const msgBookingId = String(
+        msg.bookingId ||
+        (typeof msg.roomId === 'string' && msg.roomId.replace(/^booking_/, '')) ||
+        '',
+      );
+      if (msgBookingId && msgBookingId !== String(id)) return;
+      setMessages((prev) => {
+        const incomingId = String(msg._id || msg.id || msg.tempId || '');
+        const exists = prev.some((m) => String(m._id || m.id || m.tempId) === incomingId);
+        return exists ? prev : [...prev, msg];
+      });
+    };
+
+    if (sock) {
+      sock.emit('chat:join', { roomId: bookingRoom });
+      sock.on('new-message', onMessage); // room broadcast
+      sock.on('message:new', onMessage); // direct user-room push
+    }
+
+    // Polling now a 30s safety net — only kicks in if the socket drops.
+    pollRef.current = setInterval(loadMessages, 30000);
+
+    return () => {
+      if (sock) {
+        sock.emit('chat:leave', { roomId: bookingRoom });
+        sock.off('new-message', onMessage);
+        sock.off('message:new', onMessage);
+      }
+      clearInterval(pollRef.current);
+    };
+  }, [id, loadMessages]);
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
   const action = async (kind) => {
