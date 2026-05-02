@@ -1,12 +1,13 @@
 // /Users/orange/Documents/QHAIMODE copy 2/frontend/app/admin/ops/reviews/page.jsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import staffApi from '@/lib/axios/staffApi';
-import { PageHeader, Spinner, ErrorBox, EmptyState, Button } from '@/components/staff/ui';
+import { PageHeader, Spinner, ErrorBox, EmptyState, Button, SearchInput, Pagination } from '@/components/staff/ui';
 import { showSuccess, showError } from '@/lib/utils/toast';
 
 const TABS = ['all', 'pending', 'approved', 'rejected'];
+const PAGE_SIZE = 20;
 
 function StarRating({ rating }) {
   const n = Math.round(Math.max(0, Math.min(5, rating || 0)));
@@ -35,27 +36,43 @@ function ReviewStatusBadge({ status }) {
 
 export default function ReviewsModerationPage() {
   const [tab, setTab] = useState('pending');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+
   const [items, setItems] = useState(null);
+  const [meta, setMeta] = useState({ total: 0, totalPages: 1 });
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
   const [busy, setBusy] = useState({});
 
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(PAGE_SIZE));
+    if (tab !== 'all') params.set('status', tab);
+    if (q.trim()) params.set('q', q.trim());
+    return params.toString();
+  }, [page, tab, q]);
+
   const load = useCallback(() => {
-    setItems(null);
-    setError(null);
-    const params = tab !== 'all' ? { status: tab } : {};
     staffApi
-      .get('/admin-ops/reviews', { params })
+      .get(`/admin-ops/reviews?${queryString}`)
       .then((r) => {
         const d = r.data?.data;
         setItems(Array.isArray(d) ? d : []);
+        setMeta(r.data?.meta || { total: 0, totalPages: 1 });
+        setError(null);
       })
-      .catch(setError);
-  }, [tab]);
+      .catch((err) => setError(err?.response?.data?.error?.message || 'Failed to load reviews'));
+  }, [queryString]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Filter changes reset page back to 1.
+  const updateTab = (t) => { setTab(t); setPage(1); };
+  const updateQ   = (v) => { setQ(v);   setPage(1); };
 
   const moderate = async (id, status, note = '') => {
     setBusy((b) => ({ ...b, [id]: status }));
@@ -81,27 +98,35 @@ export default function ReviewsModerationPage() {
       <div className="p-4 sm:p-8 space-y-5">
         <ErrorBox error={error} />
 
-        {/* Filter Tabs */}
-        <div className="flex gap-1 bg-[#F2F9F1] border border-[#E5F1E2] rounded-xl p-1 w-fit">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-open-sauce-semibold capitalize transition-all duration-150 cursor-pointer ${
-                tab === t
-                  ? 'bg-[#45A735] text-white shadow-sm'
-                  : 'text-[#636363] hover:text-[#26472B] hover:bg-white'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        {/* Filter Tabs + Search */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex gap-1 bg-[#F2F9F1] border border-[#E5F1E2] rounded-xl p-1 w-fit">
+            {TABS.map((t) => (
+              <button
+                key={t}
+                onClick={() => updateTab(t)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-open-sauce-semibold capitalize transition-all duration-150 cursor-pointer ${
+                  tab === t
+                    ? 'bg-[#45A735] text-white shadow-sm'
+                    : 'text-[#636363] hover:text-[#26472B] hover:bg-white'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 sm:max-w-md">
+            <SearchInput value={q} onChange={updateQ} placeholder="Search comment or flag reason" />
+          </div>
+          <div className="text-xs text-[#909090]">
+            {meta.total != null && `${meta.total} review${meta.total === 1 ? '' : 's'}`}
+          </div>
         </div>
 
         {items === null && !error && <Spinner />}
 
         {items !== null && items.length === 0 && (
-          <EmptyState message={`No ${tab === 'all' ? '' : tab} reviews found.`} />
+          <EmptyState message={tab === 'all' && !q ? 'No reviews found.' : 'No reviews match these filters.'} />
         )}
 
         {items !== null && items.length > 0 && (
@@ -228,6 +253,10 @@ export default function ReviewsModerationPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {items !== null && items.length > 0 && (
+          <Pagination page={page} total={meta.total || 0} pageSize={PAGE_SIZE} onChange={setPage} />
         )}
       </div>
     </div>

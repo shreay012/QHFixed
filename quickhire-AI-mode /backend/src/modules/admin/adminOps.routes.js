@@ -93,6 +93,23 @@ r.get('/refunds', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) =
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
   if (req.query.bookingId) filter.bookingId = toObjectId(req.query.bookingId);
+
+  // Free-text search across bookingId (full hex), refund reason, and notes.
+  // Lets a finance reviewer find a single refund out of thousands without
+  // paging through them. q is regex-escaped so a search box can never
+  // smuggle in mongo operators.
+  const q = String(req.query.q || '').trim();
+  if (q) {
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(safe, 'i');
+    const orParts = [{ reason: re }, { notes: re }];
+    if (/^[0-9a-f]{24}$/i.test(q)) {
+      try { orParts.push({ bookingId: new ObjectId(q) }); } catch { /* ignore */ }
+      try { orParts.push({ paymentId: new ObjectId(q) }); } catch { /* ignore */ }
+    }
+    filter.$or = orParts;
+  }
+
   const [items, total] = await Promise.all([
     refundsCol().find(filter).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
     refundsCol().countDocuments(filter),
@@ -192,12 +209,27 @@ r.patch('/refunds/:id/review', permGuard(PERMS.REFUND_APPROVE), validate(z.objec
    PAYOUT ENGINE  (direct bank, no wallet)
 ═══════════════════════════════════════════════════════════════ */
 
-// GET /api/admin-ops/payouts?status=pending&role=pm
+// GET /api/admin-ops/payouts?status=pending&role=pm&q=…
 r.get('/payouts', permGuard(PERMS.PAYOUT_WRITE), asyncHandler(async (req, res) => {
   const p = paginate(req.query);
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
   if (req.query.role) filter.role = req.query.role;
+
+  // Free-text search across staff name / mobile / staffId. Finance teams
+  // need to find a single payout (e.g. "where's the payout for Aarav?")
+  // without paginating through the cycle.
+  const q = String(req.query.q || '').trim();
+  if (q) {
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(safe, 'i');
+    const orParts = [{ staffName: re }, { staffMobile: re }];
+    if (/^[0-9a-f]{24}$/i.test(q)) {
+      try { orParts.push({ staffId: new ObjectId(q) }); } catch { /* ignore */ }
+    }
+    filter.$or = orParts;
+  }
+
   const [items, total] = await Promise.all([
     payoutsCol().find(filter).sort({ cycleStart: -1 }).skip(p.skip).limit(p.limit).toArray(),
     payoutsCol().countDocuments(filter),
@@ -369,6 +401,16 @@ r.get('/reviews', permGuard(PERMS.KYC_READ), asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.status) filter.moderationStatus = req.query.status;
   if (req.query.flagged) filter.flagged = req.query.flagged === 'true';
+
+  // Free-text search across review text + flag reason. Lets a moderator
+  // find the specific review someone reported without scrolling pages.
+  const q = String(req.query.q || '').trim();
+  if (q) {
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(safe, 'i');
+    filter.$or = [{ comment: re }, { flagReason: re }];
+  }
+
   const [items, total] = await Promise.all([
     reviewsCol().find(filter).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
     reviewsCol().countDocuments(filter),

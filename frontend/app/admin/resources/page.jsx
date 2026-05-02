@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import staffApi from '@/lib/axios/staffApi';
 import { showError, showSuccess } from '@/lib/utils/toast';
 import {
@@ -10,7 +10,10 @@ import {
   Spinner,
   ErrorBox,
   Button,
+  Pagination,
 } from '@/components/staff/ui';
+
+const PAGE_SIZE = 20;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso) {
@@ -259,8 +262,10 @@ function ResourceModal({ open, editResource, form, setForm, onClose, onSave, bus
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminResourcesPage() {
   const [items, setItems]               = useState(null);
+  const [meta, setMeta]                 = useState({ total: 0, totalPages: 1 });
   const [error, setError]               = useState(null);
   const [search, setSearch]             = useState('');
+  const [page, setPage]                 = useState(1);
   const [modalOpen, setModalOpen]       = useState(false);
   const [editResource, setEditResource] = useState(null); // null = create, object = edit
   const [form, setForm]                 = useState(EMPTY_FORM);
@@ -268,19 +273,31 @@ export default function AdminResourcesPage() {
   const [saveBusy, setSaveBusy]         = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState(null);
 
-  // ── fetch ──────────────────────────────────────────────────────────────────
+  // ── fetch (server-side search + pagination) ────────────────────────────────
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(PAGE_SIZE));
+    if (search.trim()) params.set('q', search.trim());
+    return params.toString();
+  }, [page, search]);
+
   const load = useCallback(() => {
-    setItems(null);
-    setError(null);
     staffApi
-      .get('/admin/resources', { params: { pageSize: 50 } })
-      .then((r) => setItems(r.data?.data || []))
-      .catch(setError);
-  }, []);
+      .get(`/admin/resources?${queryString}`)
+      .then((r) => {
+        setItems(r.data?.data || []);
+        setMeta(r.data?.meta || { total: 0, totalPages: 1 });
+        setError(null);
+      })
+      .catch((err) => setError(err?.response?.data?.error?.message || 'Failed to load resources'));
+  }, [queryString]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const updateSearch = (v) => { setSearch(v); setPage(1); };
 
   // ── modal helpers ──────────────────────────────────────────────────────────
   const openCreate = () => {
@@ -351,27 +368,19 @@ export default function AdminResourcesPage() {
     }
   };
 
-  // ── derived stats ──────────────────────────────────────────────────────────
+  // ── derived stats — derived from the CURRENT page only since the server
+  // is now paginated. The "Total Resources" stat reflects the global count
+  // from the response meta; "Active" and "Skills" describe the visible
+  // page (acceptable trade-off; full-fleet stats would need a separate
+  // /admin/resources/stats endpoint we don't have yet).
   const allItems    = items || [];
   const activeCount = allItems.filter((r) => (r.meta?.status || 'active') === 'active').length;
   const skillSet    = new Set(
     allItems.flatMap((r) => r.skills || []).filter(Boolean)
   );
 
-  // ── client-side search ─────────────────────────────────────────────────────
-  const filteredItems = allItems.filter((r) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      (r.name   || '').toLowerCase().includes(q) ||
-      (r.mobile || '').includes(q) ||
-      (r.email  || '').toLowerCase().includes(q) ||
-      (r.skills || []).some((s) => s.toLowerCase().includes(q))
-    );
-  });
-
-  // ── table rows — attach _onEdit callback so RemoveAction can trigger edit ──
-  const tableRows = filteredItems.map((r) => ({ ...r, _onEdit: openEdit }));
+  // Server already returned only matching rows — no client filter step.
+  const tableRows = allItems.map((r) => ({ ...r, _onEdit: openEdit }));
 
   // ── columns ────────────────────────────────────────────────────────────────
   const columns = [
@@ -441,9 +450,9 @@ export default function AdminResourcesPage() {
         {items !== null && (
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Total Resources', value: allItems.length },
-              { label: 'Active',          value: activeCount     },
-              { label: 'Skills',          value: skillSet.size   },
+              { label: 'Total Resources',     value: meta.total ?? allItems.length },
+              { label: 'Active (this page)',  value: activeCount     },
+              { label: 'Skills (this page)',  value: skillSet.size   },
             ].map(({ label, value }) => (
               <div
                 key={label}
@@ -474,14 +483,14 @@ export default function AdminResourcesPage() {
           </svg>
           <input
             type="text"
-            placeholder="Search by name, mobile, email, or skill…"
+            placeholder="Search by name, mobile, or email…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => updateSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 border border-[#E5F1E2] rounded-xl text-sm font-open-sauce bg-white focus:ring-2 focus:ring-[#45A735]/30 focus:border-[#45A735] focus:outline-none placeholder:text-[#909090]"
           />
           {search && (
             <button
-              onClick={() => setSearch('')}
+              onClick={() => updateSearch('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-[#909090] hover:text-[#484848] transition-colors"
               aria-label="Clear search"
             >
@@ -495,12 +504,15 @@ export default function AdminResourcesPage() {
         {/* Table */}
         {items === null && !error && <Spinner />}
         {items !== null && (
-          <Table
-            columns={columns}
-            rows={tableRows}
-            keyField="_id"
-            empty="No resources yet. Click '+ Add Resource' to onboard one."
-          />
+          <>
+            <Table
+              columns={columns}
+              rows={tableRows}
+              keyField="_id"
+              empty={search ? 'No resources match this search.' : "No resources yet. Click '+ Add Resource' to onboard one."}
+            />
+            <Pagination page={page} total={meta.total || 0} pageSize={PAGE_SIZE} onChange={setPage} />
+          </>
         )}
       </div>
 

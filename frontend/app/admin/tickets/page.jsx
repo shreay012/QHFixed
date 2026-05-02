@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import staffApi from '@/lib/axios/staffApi';
 import { showError, showSuccess } from '@/lib/utils/toast';
@@ -11,7 +11,16 @@ import {
   ErrorBox,
   Button,
   Table,
+  Pagination,
 } from '@/components/staff/ui';
+
+const PAGE_SIZE = 20;
+const PRIORITY_OPTIONS = [
+  { value: '',        label: 'All priorities' },
+  { value: 'high',    label: 'High' },
+  { value: 'medium',  label: 'Medium' },
+  { value: 'low',     label: 'Low' },
+];
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -61,25 +70,38 @@ export default function AdminTicketsPage() {
   const router = useRouter();
 
   const [items, setItems]     = useState(null);
+  const [meta, setMeta]       = useState({ total: 0, totalPages: 1 });
   const [error, setError]     = useState(null);
   const [filter, setFilter]   = useState('');
+  const [priority, setPriority] = useState('');
   const [search, setSearch]   = useState('');
+  const [page, setPage]       = useState(1);
 
-  // ── Load ──────────────────────────────────────────────────────────────────
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(PAGE_SIZE));
+    if (filter) params.set('status', filter);
+    if (priority) params.set('priority', priority);
+    if (search.trim()) params.set('q', search.trim());
+    return params.toString();
+  }, [page, filter, priority, search]);
 
-  const load = useCallback(async () => {
-    setItems(null);
-    setError(null);
-    try {
-      const params = filter ? { status: filter } : {};
-      const r = await staffApi.get('/admin/tickets', { params });
-      setItems(r.data?.data || []);
-    } catch (e) {
-      setError(e);
-    }
-  }, [filter]);
+  const load = useCallback(() => {
+    staffApi.get(`/admin/tickets?${queryString}`)
+      .then((r) => {
+        setItems(r.data?.data || []);
+        setMeta(r.data?.meta || { total: 0, totalPages: 1 });
+        setError(null);
+      })
+      .catch((e) => setError(e?.response?.data?.error?.message || 'Failed to load tickets'));
+  }, [queryString]);
 
   useEffect(() => { load(); }, [load]);
+
+  const updateFilter   = (k) => { setFilter(k);   setPage(1); };
+  const updatePriority = (e) => { setPriority(e.target.value); setPage(1); };
+  const updateSearch   = (v) => { setSearch(v); setPage(1); };
 
   // ── Quick status update ───────────────────────────────────────────────────
 
@@ -93,27 +115,32 @@ export default function AdminTicketsPage() {
     }
   };
 
-  // ── Derived stats ─────────────────────────────────────────────────────────
+  // ── Stats: pulled separately so they reflect the FULL queue rather than
+  // just the current filtered/paginated page. Same trick as refunds —
+  // hit the same endpoint with status filters and pull the count from
+  // the response meta.
+  const [stats, setStats] = useState({ open: 0, in_progress: 0, escalated: 0, resolved: 0 });
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      staffApi.get('/admin/tickets?status=open&pageSize=1').catch(() => null),
+      staffApi.get('/admin/tickets?status=in_progress&pageSize=1').catch(() => null),
+      staffApi.get('/admin/tickets?status=escalated&pageSize=1').catch(() => null),
+      staffApi.get('/admin/tickets?status=resolved&pageSize=1').catch(() => null),
+    ]).then(([open, ip, esc, res]) => {
+      if (!alive) return;
+      setStats({
+        open:        open?.data?.meta?.total ?? 0,
+        in_progress: ip?.data?.meta?.total ?? 0,
+        escalated:   esc?.data?.meta?.total ?? 0,
+        resolved:    res?.data?.meta?.total ?? 0,
+      });
+    });
+    return () => { alive = false; };
+  }, []);
 
-  const all = items || [];
-  const stats = {
-    open:        all.filter(t => t.status === 'open').length,
-    in_progress: all.filter(t => t.status === 'in_progress').length,
-    escalated:   all.filter(t => t.status === 'escalated').length,
-    resolved:    all.filter(t => t.status === 'resolved').length,
-  };
-
-  // ── Search filter ─────────────────────────────────────────────────────────
-
-  const visible = search.trim()
-    ? all.filter(t => {
-        const q = search.toLowerCase();
-        return (
-          (t.subject || '').toLowerCase().includes(q) ||
-          (t.customerName || '').toLowerCase().includes(q)
-        );
-      })
-    : all;
+  // Server-side filtering — items already match status/priority/q.
+  const visible = items || [];
 
   // ── Table columns ─────────────────────────────────────────────────────────
 
@@ -193,14 +220,14 @@ export default function AdminTicketsPage() {
         subtitle="Manage customer support requests"
       />
 
-      {/* Status filter pills */}
-      <div className="px-4 sm:px-8 pt-4 flex flex-wrap gap-2">
+      {/* Status filter pills + priority dropdown */}
+      <div className="px-4 sm:px-8 pt-4 flex flex-wrap gap-2 items-center">
         {FILTER_PILLS.map(pill => {
           const active = filter === pill.key;
           return (
             <button
               key={pill.key}
-              onClick={() => setFilter(pill.key)}
+              onClick={() => updateFilter(pill.key)}
               className={`rounded-full px-3 py-1.5 text-xs font-open-sauce-semibold transition-all duration-150 ${
                 active
                   ? 'bg-[#45A735] text-white'
@@ -211,6 +238,15 @@ export default function AdminTicketsPage() {
             </button>
           );
         })}
+        <select
+          value={priority}
+          onChange={updatePriority}
+          className="ml-auto text-xs border border-[#E5F1E2] rounded-full px-3 py-1.5 bg-white text-[#484848] cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#45A735]/30"
+        >
+          {PRIORITY_OPTIONS.map((o) => (
+            <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </div>
 
       <div className="p-4 sm:p-8 space-y-4">
@@ -240,13 +276,13 @@ export default function AdminTicketsPage() {
               <input
                 type="text"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search tickets…"
+                onChange={e => updateSearch(e.target.value)}
+                placeholder="Search subject, ticket ID, customer name/email/mobile…"
                 className="w-full border border-[#D6EBCF] rounded-xl pl-9 pr-4 py-2.5 text-sm font-open-sauce text-[#242424] bg-white focus:ring-2 focus:ring-[#45A735]/30 focus:border-[#45A735] focus:outline-none placeholder:text-[#909090] transition-colors"
               />
               {search && (
                 <button
-                  onClick={() => setSearch('')}
+                  onClick={() => updateSearch('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[#909090] hover:text-[#484848]"
                   aria-label="Clear search"
                 >
@@ -263,6 +299,7 @@ export default function AdminTicketsPage() {
               keyField="_id"
               empty="No tickets match your filters."
             />
+            <Pagination page={page} total={meta.total || 0} pageSize={PAGE_SIZE} onChange={setPage} />
           </>
         )}
       </div>

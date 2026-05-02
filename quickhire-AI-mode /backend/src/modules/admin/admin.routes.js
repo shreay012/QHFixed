@@ -505,9 +505,38 @@ const toEnglish = (v) => {
   return v.en || Object.values(v).find(Boolean) || '';
 };
 
-r.get('/services', asyncHandler(async (_req, res) => {
-  const items = await servicesCol().find({}).sort({ createdAt: -1 }).toArray();
-  res.json({ success: true, data: items });
+r.get('/services', asyncHandler(async (req, res) => {
+  // Servicing the catalog admin: paginated, searchable, filterable.
+  // The previous handler returned every service in one shot which would
+  // have collapsed once the catalog grew past a few hundred entries — and
+  // the FE silently dropped any rows beyond the rendered page anyway.
+  const p = paginate(req.query);
+  const filter = {};
+  if (req.query.active === 'true')  filter.active = true;
+  if (req.query.active === 'false') filter.active = false;
+  if (req.query.category) filter.category = String(req.query.category);
+
+  // Search across English name, slug, and any localised name variant.
+  // Service `name` is stored as either a string or an i18n object — match
+  // the regex in `name` (string case) or any of `name.en`, `name.de`, …
+  // (i18n-object case) via $or expansion.
+  const q = String(req.query.q || '').trim();
+  if (q) {
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(safe, 'i');
+    filter.$or = [
+      { name: re },
+      { slug: re },
+      { 'name.en': re }, { 'name.hi': re }, { 'name.de': re },
+      { 'name.ar': re }, { 'name.es': re },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    servicesCol().find(filter).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
+    servicesCol().countDocuments(filter),
+  ]);
+  res.json({ success: true, data: items, meta: buildMeta({ page: p.page, pageSize: p.pageSize, total }) });
 }));
 
 r.get('/services/categories', asyncHandler(async (_req, res) => {
@@ -618,6 +647,17 @@ const makeStaffRoutes = (role, basePath) => {
   r.get(basePath, asyncHandler(async (req, res) => {
     const p = paginate(req.query);
     const filter = { role, deletedAt: { $exists: false } };
+
+    // Free-text search across name / mobile / email for the PM and
+    // Resource directories. With staffing fleets in the thousands the
+    // admin needs to find a single record without paginating.
+    const q = String(req.query.q || '').trim();
+    if (q) {
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(safe, 'i');
+      filter.$or = [{ name: re }, { mobile: re }, { email: re }];
+    }
+
     const [items, total] = await Promise.all([
       usersCol().find(filter).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
       usersCol().countDocuments(filter),
@@ -744,8 +784,39 @@ r.get('/jobs', asyncHandler(async (req, res) => {
  * ───────────────────────────────────────────────────────────── */
 r.get('/tickets', asyncHandler(async (req, res) => {
   const p = paginate(req.query);
-  const filter = req.query.status ? { status: String(req.query.status) } : {};
-  const items = await ticketsCol().find(filter).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray();
+  const filter = {};
+  if (req.query.status)   filter.status   = String(req.query.status);
+  if (req.query.priority) filter.priority = String(req.query.priority);
+
+  // Free-text search across subject, ticket _id, and the full set of
+  // hydrated user fields — but since name/email/mobile live on the users
+  // collection we resolve them to userId filters separately and union.
+  const q = String(req.query.q || '').trim();
+  if (q) {
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(safe, 'i');
+    const orParts = [{ subject: re }, { description: re }];
+    if (/^[0-9a-f]{24}$/i.test(q)) {
+      try { orParts.push({ _id: new ObjectId(q) }); } catch { /* ignore */ }
+    }
+    // Look up matching users by name / email / mobile and add them to the
+    // OR. Bounded by limit(20) so a generic search doesn't pull half the
+    // users collection into memory.
+    const matchingUsers = await usersCol()
+      .find({ $or: [{ name: re }, { mobile: re }, { email: re }] })
+      .project({ _id: 1 })
+      .limit(20)
+      .toArray();
+    if (matchingUsers.length) {
+      orParts.push({ userId: { $in: matchingUsers.map((u) => u._id) } });
+    }
+    filter.$or = orParts;
+  }
+
+  const [items, total] = await Promise.all([
+    ticketsCol().find(filter).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
+    ticketsCol().countDocuments(filter),
+  ]);
   const userIds = [...new Set(items.map((t) => String(t.userId)).filter(Boolean))];
   const users = userIds.length
     ? await usersCol().find({ _id: { $in: userIds.map((x) => { try { return new ObjectId(x); } catch { return null; } }).filter(Boolean) } }).toArray()
@@ -755,7 +826,7 @@ r.get('/tickets', asyncHandler(async (req, res) => {
     const u = uMap.get(String(t.userId));
     return { ...t, customerName: u?.name || u?.mobile || 'N/A' };
   });
-  res.json({ success: true, data: hydrated });
+  res.json({ success: true, data: hydrated, meta: buildMeta({ page: p.page, pageSize: p.pageSize, total }) });
 }));
 
 r.get('/tickets/:id', asyncHandler(async (req, res) => {

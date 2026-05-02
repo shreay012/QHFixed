@@ -1,7 +1,7 @@
 // /frontend/app/admin/ops/payouts/page.jsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import staffApi from '@/lib/axios/staffApi';
 import {
   PageHeader,
@@ -10,8 +10,12 @@ import {
   EmptyState,
   Button,
   StatCard,
+  Pagination,
+  SearchInput,
 } from '@/components/staff/ui';
 import { showSuccess, showError } from '@/lib/utils/toast';
+
+const PAGE_SIZE = 20;
 
 const CURRENCY_SYMBOLS = {
   INR: '₹',
@@ -286,48 +290,69 @@ function MarkProcessedModal({ payout, onClose, onProcessed }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AdminOpsPayoutsPage() {
   const [items, setItems] = useState(null);
+  const [meta, setMeta]   = useState({ total: 0, totalPages: 1 });
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('All');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
   const [processing, setProcessing] = useState(null); // payout being acted on
   const [showCompute, setShowCompute] = useState(false);
   const [showRecon, setShowRecon] = useState(false);
 
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('pageSize', String(PAGE_SIZE));
+    if (tab !== 'All') params.set('status', tab);
+    if (q.trim()) params.set('q', q.trim());
+    return params.toString();
+  }, [page, tab, q]);
+
   const load = useCallback(() => {
-    setError(null);
-    staffApi.get('/admin-ops/payouts')
-      .then((r) => setItems(r.data?.data || []))
-      .catch((err) => {
-        setError(err);
-        setItems([]);
-      });
-  }, []);
+    staffApi.get(`/admin-ops/payouts?${queryString}`)
+      .then((r) => {
+        setItems(r.data?.data || []);
+        setMeta(r.data?.meta || { total: 0, totalPages: 1 });
+        setError(null);
+      })
+      .catch((err) => setError(err?.response?.data?.error?.message || 'Failed to load payouts'));
+  }, [queryString]);
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = items
-    ? tab === 'All' ? items : items.filter((p) => p.status === tab)
-    : [];
-
-  // Stats derived from full list
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-
-  const pendingAmt = items
-    ? items.filter((p) => p.status === 'pending').reduce((s, p) => s + (Number(p.amount) || 0), 0)
-    : 0;
-
-  const processedCount = items
-    ? items.filter((p) => p.status === 'processed').length
-    : 0;
-
-  const thisMonthAmt = items
-    ? items
+  // Stats: pulled from dedicated tiny queries so they reflect the full
+  // queue (not just the current filter/page). Same trick as refunds.
+  const [stats, setStats] = useState({ pendingAmount: 0, processedCount: 0, thisMonthAmount: 0 });
+  useEffect(() => {
+    let alive = true;
+    const currentMonth = new Date().getMonth();
+    const currentYear  = new Date().getFullYear();
+    Promise.all([
+      // Pull up to 100 pending payouts so we can sum amount; bounded.
+      staffApi.get('/admin-ops/payouts?status=pending&pageSize=100').catch(() => null),
+      staffApi.get('/admin-ops/payouts?status=processed&pageSize=100').catch(() => null),
+    ]).then(([pending, processed]) => {
+      if (!alive) return;
+      const pendList   = pending?.data?.data   || [];
+      const procList   = processed?.data?.data || [];
+      const pendingAmount = pendList.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const thisMonthAmount = procList
         .filter((p) => {
           const d = p.processedAt ? new Date(p.processedAt) : null;
           return d && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
         })
-        .reduce((s, p) => s + (Number(p.amount) || 0), 0)
-    : 0;
+        .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      setStats({
+        pendingAmount,
+        processedCount: processed?.data?.meta?.total ?? procList.length,
+        thisMonthAmount,
+      });
+    });
+    return () => { alive = false; };
+  }, []);
+
+  const updateTab = (t) => { setTab(t); setPage(1); };
+  const updateQ   = (v) => { setQ(v);   setPage(1); };
 
   const cols = [
     {
@@ -421,19 +446,19 @@ export default function AdminOpsPayoutsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard
             label="Total Pending"
-            value={items === null ? '…' : formatAmount(pendingAmt, 'INR')}
+            value={formatAmount(stats.pendingAmount, 'INR')}
             hint="Sum of pending payouts"
             color="orange"
           />
           <StatCard
             label="Total Processed"
-            value={items === null ? '…' : processedCount}
+            value={stats.processedCount}
             hint="Payouts marked settled"
             color="green"
           />
           <StatCard
             label="This Month"
-            value={items === null ? '…' : formatAmount(thisMonthAmt, 'INR')}
+            value={formatAmount(stats.thisMonthAmount, 'INR')}
             hint="Processed in current month"
             color="slate"
           />
@@ -442,56 +467,67 @@ export default function AdminOpsPayoutsPage() {
         {/* Error */}
         <ErrorBox error={error} />
 
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-1 bg-white border border-[#E5F1E2] rounded-xl p-1 w-fit">
-          {STATUS_TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-open-sauce-semibold transition-all duration-150 cursor-pointer ${
-                tab === t
-                  ? 'bg-[#45A735] text-white shadow-sm'
-                  : 'text-[#636363] hover:text-[#26472B] hover:bg-[#F2F9F1]'
-              }`}
-            >
-              {t === 'All' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
+        {/* Filter Tabs + Search */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-1 bg-white border border-[#E5F1E2] rounded-xl p-1 w-fit">
+            {STATUS_TABS.map((t) => (
+              <button
+                key={t}
+                onClick={() => updateTab(t)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-open-sauce-semibold transition-all duration-150 cursor-pointer ${
+                  tab === t
+                    ? 'bg-[#45A735] text-white shadow-sm'
+                    : 'text-[#636363] hover:text-[#26472B] hover:bg-[#F2F9F1]'
+                }`}
+              >
+                {t === 'All' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 sm:max-w-md">
+            <SearchInput value={q} onChange={updateQ} placeholder="Search by staff name, mobile, or staff ID" />
+          </div>
+          <div className="text-xs text-[#909090]">
+            {meta.total != null && `${meta.total} payout${meta.total === 1 ? '' : 's'}`}
+          </div>
         </div>
 
         {/* Table */}
         {items === null && !error && <Spinner />}
         {items !== null && (
-          filtered.length === 0
-            ? <EmptyState message={tab === 'All' ? 'No payouts found.' : `No ${tab} payouts.`} />
+          items.length === 0
+            ? <EmptyState message={tab === 'All' && !q ? 'No payouts found.' : 'No payouts match these filters.'} />
             : (
-              <div className="overflow-x-auto bg-white border border-[#E5F1E2] rounded-2xl shadow-[0_1px_3px_rgba(38,71,43,0.04)]">
-                <table className="min-w-full text-sm font-open-sauce">
-                  <thead className="bg-[#F2F9F1] text-[#26472B]">
-                    <tr>
-                      {cols.map((c) => (
-                        <th
-                          key={c.key}
-                          className="text-left font-open-sauce-semibold text-[12px] uppercase tracking-wider px-4 py-3 whitespace-nowrap"
-                        >
-                          {c.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#EEF5EC]">
-                    {filtered.map((p) => (
-                      <tr key={p._id} className="hover:bg-[#F7FBF6] transition-colors">
+              <>
+                <div className="overflow-x-auto bg-white border border-[#E5F1E2] rounded-2xl shadow-[0_1px_3px_rgba(38,71,43,0.04)]">
+                  <table className="min-w-full text-sm font-open-sauce">
+                    <thead className="bg-[#F2F9F1] text-[#26472B]">
+                      <tr>
                         {cols.map((c) => (
-                          <td key={c.key} className="px-4 py-3.5 align-top text-[#484848]">
-                            {c.render ? c.render(p) : p[c.key] ?? '—'}
-                          </td>
+                          <th
+                            key={c.key}
+                            className="text-left font-open-sauce-semibold text-[12px] uppercase tracking-wider px-4 py-3 whitespace-nowrap"
+                          >
+                            {c.label}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-[#EEF5EC]">
+                      {items.map((p) => (
+                        <tr key={p._id} className="hover:bg-[#F7FBF6] transition-colors">
+                          {cols.map((c) => (
+                            <td key={c.key} className="px-4 py-3.5 align-top text-[#484848]">
+                              {c.render ? c.render(p) : p[c.key] ?? '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination page={page} total={meta.total || 0} pageSize={PAGE_SIZE} onChange={setPage} />
+              </>
             )
         )}
       </div>
