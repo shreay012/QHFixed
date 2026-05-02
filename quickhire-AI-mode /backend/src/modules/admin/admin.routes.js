@@ -4,12 +4,14 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { adminGuard, permGuard } from '../../middleware/role.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { auditAdmin } from '../../middleware/audit.middleware.js';
+import { rateLimitSearch } from '../../middleware/rateLimit.middleware.js';
 import { getDb } from '../../config/db.js';
 import { redis } from '../../config/redis.js';
 import { clearCachePattern, deleteCacheValue, getOrSet } from '../../utils/cache.js';
 import { CACHE_KEYS } from '../../utils/cache.keys.js';
 import { ObjectId } from 'mongodb';
 import { paginate, buildMeta } from '../../utils/pagination.js';
+import { searchBookings as meiliSearchBookings, searchResources as meiliSearchResources, isMeiliReady } from '../../config/meilisearch.js';
 import * as bookingService from '../booking/booking.service.js';
 import { AppError } from '../../utils/AppError.js';
 import { toObjectId } from '../../utils/oid.js';
@@ -146,28 +148,40 @@ r.get('/bookings/:id', asyncHandler(async (req, res) => {
    hex strings are short-circuited to direct ObjectId lookups so a paste
    of a booking/payment/user id always lands first.
 ══════════════════════════════════════════════════════════════════════ */
-r.get('/search', asyncHandler(async (req, res) => {
+r.get('/search', rateLimitSearch(), asyncHandler(async (req, res) => {
   const raw = String(req.query.q || '').trim();
   if (raw.length < 2) {
     return res.json({ success: true, data: { bookings: [], customers: [], payments: [], tickets: [] } });
   }
   const safe = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(safe, 'i');
-  const isOid = /^[0-9a-f]{24}$/i.test(raw);
-  const isPartialOid = /^[0-9a-f]{4,23}$/i.test(raw);
   const oid = (() => { try { return new ObjectId(raw); } catch { return null; } })();
   const cap = 5;
 
-  // ── Bookings — match _id, partial _id tail, or hydrated customer fields
+  // Bookings + (PM/resource) staff: prefer Meilisearch when ready. The
+  // bookings + resources collections are the two largest the search hits
+  // and the only ones already wired into Meili indexes (see
+  // config/meilisearch.js). Customers / payments / tickets fall back to
+  // Mongo for now — separate Meili indexes can be added later if those
+  // become hot. When Meili is unhealthy we transparently fall back to
+  // Mongo regex for everything so search never returns "service down".
+  const meiliBookings = await meiliSearchBookings(raw, { limit: cap });
+  const meiliResources = await meiliSearchResources(raw, { limit: cap });
+
+  // ── Bookings — Meili-first, Mongo fallback. The previous Mongo path
+  // used `$expr: { $regexMatch: { $toString: '$_id' } }` which forces a
+  // full collection scan even on indexed _id. The fallback now matches
+  // ObjectId only when the input is a full 24-char hex string and
+  // otherwise relies on the customer-field regex (which still scans
+  // jobs at scale — that's why the Meili path is preferred).
   const bookingFilter = { $or: [
     ...(oid ? [{ _id: oid }] : []),
-    ...(isPartialOid ? [{ $expr: { $regexMatch: { input: { $toString: '$_id' }, regex: re } } }] : []),
     { customerName: re },
     { customerMobile: re },
     { customerEmail: re },
   ]};
 
-  // ── Customers (role 'user') — name / mobile / email
+  // Customers (role 'user') — name / mobile / email
   const customerFilter = { role: 'user', $or: [
     ...(oid ? [{ _id: oid }] : []),
     { name: re },
@@ -175,14 +189,14 @@ r.get('/search', asyncHandler(async (req, res) => {
     { email: re },
   ]};
 
-  // ── Payments — Razorpay/Stripe IDs are short strings, not ObjectIds.
+  // Payments — Razorpay/Stripe IDs are short strings, not ObjectIds.
   const paymentFilter = { $or: [
     { paymentId: re },
     { orderId:   re },
     ...(oid ? [{ _id: oid }] : []),
   ]};
 
-  // ── Tickets — subject + ticket _id + linked user
+  // Tickets — subject + ticket _id + linked user (looked up below)
   const userMatchIds = (await usersCol()
     .find({ $or: [{ name: re }, { mobile: re }, { email: re }] })
     .project({ _id: 1 })
@@ -194,12 +208,29 @@ r.get('/search', asyncHandler(async (req, res) => {
     ...(userMatchIds.length ? [{ userId: { $in: userMatchIds } }] : []),
   ]};
 
+  // Bookings: hydrate from Meili if we got hits, otherwise fall back to
+  // Mongo. Meili hits are pre-shaped via indexBooking() so we can use
+  // them directly.
+  const bookingsTask = (meiliBookings && meiliBookings.length)
+    ? Promise.resolve(meiliBookings.map((h) => ({
+        _id: h._id,
+        customerName: h.customerName,
+        customerMobile: h.customerMobile,
+        serviceName: h.serviceTitle,
+        status: h.status,
+      })))
+    : jobsCol().find(bookingFilter).sort({ createdAt: -1 }).limit(cap).toArray();
+
   const [bookings, customers, payments, tickets] = await Promise.all([
-    jobsCol().find(bookingFilter).sort({ createdAt: -1 }).limit(cap).toArray(),
+    bookingsTask,
     usersCol().find(customerFilter).sort({ createdAt: -1 }).limit(cap).toArray(),
     paymentsCol().find(paymentFilter).sort({ createdAt: -1 }).limit(cap).toArray(),
     ticketsCol().find(ticketFilter).sort({ createdAt: -1 }).limit(cap).toArray(),
   ]);
+
+  // Surface a debug header so on-call can tell at a glance whether the
+  // search hit Meili or fell back. Doesn't leak anything sensitive.
+  res.setHeader('x-search-backend', isMeiliReady() ? 'meilisearch' : 'mongo');
 
   // Shape each row into { kind, _id, label, sublabel, route } so the FE
   // doesn't have to know the schema differences. The route field is what

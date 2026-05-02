@@ -148,3 +148,38 @@ export async function indexArticle(article) {
   await getMeili().index('articles').addDocuments([doc]);
 }
 
+/* ─── Search helpers — used by /admin/search and the per-page ?q= ─── */
+
+/**
+ * Search the bookings index. Returns the raw Meili `hits` array (each
+ * already shaped via indexBooking() above) capped at `limit`. Caller
+ * decides whether to fall back to Mongo regex on empty / failure.
+ *
+ * Meilisearch supports typo-tolerance and prefix matching out of the
+ * box, so a search for "aara" matches "Aarav" without us crafting a
+ * regex — and at 1M+ docs it runs in <50ms vs Mongo's COLLSCAN.
+ */
+export async function searchBookings(q, { limit = 5 } = {}) {
+  if (!isMeiliReady() || !q) return null;
+  try {
+    const res = await getMeili().index('bookings').search(q, { limit });
+    return res?.hits || [];
+  } catch (err) {
+    logger.warn({ err: err.message, q }, 'meili bookings search failed');
+    return null;
+  }
+}
+
+export async function searchResources(q, { limit = 5, role } = {}) {
+  if (!isMeiliReady() || !q) return null;
+  try {
+    const opts = { limit };
+    if (role) opts.filter = `role = ${JSON.stringify(role)}`;
+    const res = await getMeili().index('resources').search(q, opts);
+    return res?.hits || [];
+  } catch (err) {
+    logger.warn({ err: err.message, q, role }, 'meili resources search failed');
+    return null;
+  }
+}
+

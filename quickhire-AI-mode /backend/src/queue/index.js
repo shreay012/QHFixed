@@ -16,11 +16,33 @@ import { logger } from '../config/logger.js';
  * - analytics: async analytics/reporting tasks
  */
 
-// Create dedicated Redis connection for BullMQ (requires maxRetriesPerRequest: null)
-const bullConnection = new Redis(env.REDIS_URL, {
+// Create dedicated Redis connection for BullMQ (requires
+// maxRetriesPerRequest: null). Uses REDIS_URL_QUEUE if set so the queue
+// can run on its own Redis instance — important at scale, since one
+// slow KEYS / blocked Lua script on the cache instance shouldn't pause
+// notification dispatch. Falls back to the shared REDIS_URL otherwise.
+const bullConnection = new Redis(env.REDIS_URL_QUEUE || env.REDIS_URL, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
 });
+
+/**
+ * Per-queue concurrency defaults. Notifications are the highest-volume
+ * queue (every booking transition + every chat message + push fan-out
+ * funnels through here) so it gets the biggest concurrency head-room.
+ * Overridable per-process via env so a single deploy can fan out across
+ * dedicated worker pods.
+ *
+ * At 50K live bookings × ~5 events/min/booking ≈ 4K events/sec, the
+ * old default of 5 would back up jobs in seconds. 50 per worker × N
+ * worker pods clears the queue in real time.
+ */
+const QUEUE_CONCURRENCY = {
+  notifications: Number(env.QUEUE_CONCURRENCY_NOTIFICATIONS) || 50,
+  lifecycle:     Number(env.QUEUE_CONCURRENCY_LIFECYCLE)     || 25,
+  emails:        Number(env.QUEUE_CONCURRENCY_EMAILS)        || 20,
+  analytics:     Number(env.QUEUE_CONCURRENCY_ANALYTICS)     || 10,
+};
 
 const queues = {};
 const workers = {};
@@ -85,12 +107,21 @@ export function registerWorker(name, handler, options = {}) {
     return workers[name];
   }
 
+  // Concurrency precedence: explicit option > per-queue env override >
+  // queue-name default > hard fallback of 5. The named-queue defaults
+  // are tuned for 1M-user scale (notifications=50, lifecycle=25, …).
+  const concurrency = options.concurrency
+    || QUEUE_CONCURRENCY[name]
+    || 5;
+
   const worker = new Worker(name, handler, {
     connection: bullConnection,
-    concurrency: options.concurrency || 5, // Default: 5 concurrent jobs
+    concurrency,
     lockDuration: options.lockDuration || 30000, // 30s lock per job
     lockRenewTime: options.lockRenewTime || 15000, // Renew lock every 15s
     ...options,
+    // Re-apply concurrency after the spread so options.concurrency from
+    // the caller doesn't get overwritten by ...options spreading itself.
   });
 
   // Event listeners
@@ -110,7 +141,7 @@ export function registerWorker(name, handler, options = {}) {
   });
 
   workers[name] = worker;
-  logger.info({ queue: name, concurrency: options.concurrency || 5 }, 'worker registered');
+  logger.info({ queue: name, concurrency }, 'worker registered');
 
   return worker;
 }

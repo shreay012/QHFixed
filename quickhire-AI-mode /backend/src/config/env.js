@@ -20,6 +20,14 @@ const schema = z.object({
   REDIS_URL_QUEUE:  z.string().optional(),
   REDIS_URL_PUBSUB: z.string().optional(),
 
+  // Per-queue worker concurrency overrides. Defaults are tuned for ~1M
+  // users / ~50K live bookings (see queue/index.js). Lower these for
+  // smaller deploys to cap Mongo / Redis / push-API spend.
+  QUEUE_CONCURRENCY_NOTIFICATIONS: z.coerce.number().optional(),
+  QUEUE_CONCURRENCY_LIFECYCLE:     z.coerce.number().optional(),
+  QUEUE_CONCURRENCY_EMAILS:        z.coerce.number().optional(),
+  QUEUE_CONCURRENCY_ANALYTICS:     z.coerce.number().optional(),
+
   JWT_PRIVATE_KEY: z.string(),
   JWT_PUBLIC_KEY: z.string().optional(),
   JWT_ALGORITHM: z.enum(['RS256', 'HS256']).default('RS256'),

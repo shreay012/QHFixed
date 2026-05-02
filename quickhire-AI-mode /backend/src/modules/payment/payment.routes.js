@@ -17,6 +17,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { roleGuard } from '../../middleware/role.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
+import { rateLimitPayment } from '../../middleware/rateLimit.middleware.js';
 import { getDb } from '../../config/db.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
@@ -61,7 +62,7 @@ const confirmStripeSchema = z.object({
    Geo-aware: selects gateway + currency from req.geo
 ══════════════════════════════════════════════════════════════════ */
 
-r.post('/create-order', roleGuard(['user']), validate(createOrderSchema), asyncHandler(async (req, res) => {
+r.post('/create-order', rateLimitPayment(), roleGuard(['user']), validate(createOrderSchema), asyncHandler(async (req, res) => {
   const { jobId, amount } = req.body;
 
   const job = await jobsCol().findOne({ _id: toObjectId(jobId, 'jobId') });
@@ -171,7 +172,7 @@ r.post('/create-order', roleGuard(['user']), validate(createOrderSchema), asyncH
    POST /verify  — Razorpay client-side signature verification
 ══════════════════════════════════════════════════════════════════ */
 
-r.post('/verify', roleGuard(['user']), validate(verifyRazorpaySchema), asyncHandler(async (req, res) => {
+r.post('/verify', rateLimitPayment(), roleGuard(['user']), validate(verifyRazorpaySchema), asyncHandler(async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
 
   // Idempotency
