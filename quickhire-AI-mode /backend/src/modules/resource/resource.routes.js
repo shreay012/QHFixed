@@ -9,6 +9,7 @@ import { getDb } from '../../config/db.js';
 import { AppError } from '../../utils/AppError.js';
 import { enqueueNotification } from '../notification/notification.service.js';
 import { emitTo } from '../../socket/index.js';
+import { getOrSet } from '../../utils/cache.js';
 
 const r = Router();
 
@@ -85,23 +86,27 @@ r.get('/me', asyncHandler(async (req, res) => {
 }));
 
 r.get('/dashboard', asyncHandler(async (req, res) => {
-  const resourceId = new ObjectId(req.user.id);
-  const [active, completed, totalLogged] = await Promise.all([
-    jobsCol().countDocuments({ resourceId, status: { $in: ['assigned_to_pm', 'in_progress', 'paused'] } }),
-    jobsCol().countDocuments({ resourceId, status: 'completed' }),
-    timeLogsCol().aggregate([
-      { $match: { resourceId } },
-      { $group: { _id: null, hours: { $sum: '$hours' } } },
-    ]).toArray(),
-  ]);
-  res.json({
-    success: true,
-    data: {
+  // Per-resource cache (30s) — collapses 3 Mongo round-trips per refresh
+  // into 1 Redis hit. Time-logs aggregation in particular was the
+  // expensive part since it scans the resource's full history of logs.
+  const resourceIdStr = String(req.user.id);
+  const data = await getOrSet(`resource:dashboard:${resourceIdStr}`, async () => {
+    const resourceId = new ObjectId(resourceIdStr);
+    const [active, completed, totalLogged] = await Promise.all([
+      jobsCol().countDocuments({ resourceId, status: { $in: ['assigned_to_pm', 'in_progress', 'paused'] } }),
+      jobsCol().countDocuments({ resourceId, status: 'completed' }),
+      timeLogsCol().aggregate([
+        { $match: { resourceId } },
+        { $group: { _id: null, hours: { $sum: '$hours' } } },
+      ]).toArray(),
+    ]);
+    return {
       activeAssignments: active,
       completedAssignments: completed,
       totalHoursLogged: totalLogged[0]?.hours || 0,
-    },
-  });
+    };
+  }, 30);
+  res.json({ success: true, data });
 }));
 
 r.get('/assignments', asyncHandler(async (req, res) => {

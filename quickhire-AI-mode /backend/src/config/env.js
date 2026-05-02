@@ -8,7 +8,17 @@ const schema = z.object({
 
   MONGO_URI: z.string(),
   MONGO_DB: z.string().default('quickhire'),
+  // Connection pool sizing — see db.js. Optional; defaults are tuned for
+  // ~1M-user / 50K-booking scale. Lower these for shared-cluster dev.
+  MONGO_MAX_POOL_SIZE: z.coerce.number().optional(),
+  MONGO_MIN_POOL_SIZE: z.coerce.number().optional(),
+
   REDIS_URL: z.string().default('redis://localhost:6379'),
+  // Optional dedicated Redis URLs — one for queue traffic (BullMQ), one
+  // for Socket.IO pub/sub adapter. Falls back to REDIS_URL if unset, so
+  // existing single-Redis deploys keep working untouched.
+  REDIS_URL_QUEUE:  z.string().optional(),
+  REDIS_URL_PUBSUB: z.string().optional(),
 
   JWT_PRIVATE_KEY: z.string(),
   JWT_PUBLIC_KEY: z.string().optional(),

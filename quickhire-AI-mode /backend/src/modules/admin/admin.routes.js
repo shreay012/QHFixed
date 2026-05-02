@@ -6,7 +6,7 @@ import { validate } from '../../middleware/validate.middleware.js';
 import { auditAdmin } from '../../middleware/audit.middleware.js';
 import { getDb } from '../../config/db.js';
 import { redis } from '../../config/redis.js';
-import { clearCachePattern, deleteCacheValue } from '../../utils/cache.js';
+import { clearCachePattern, deleteCacheValue, getOrSet } from '../../utils/cache.js';
 import { CACHE_KEYS } from '../../utils/cache.keys.js';
 import { ObjectId } from 'mongodb';
 import { paginate, buildMeta } from '../../utils/pagination.js';
@@ -92,26 +92,26 @@ async function hydrateJobs(jobs) {
 }
 
 r.get('/dashboard', asyncHandler(async (_req, res) => {
-  const [totalUsers, totalBookings, paidPayments, byStatus] = await Promise.all([
-    usersCol().countDocuments({ role: 'user' }),
-    jobsCol().countDocuments({}),
-    paymentsCol().aggregate([
-      { $match: { status: 'paid' } },
-      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
-    ]).toArray(),
-    jobsCol().aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]).toArray(),
-  ]);
-  res.json({
-    success: true,
-    data: {
+  const data = await getOrSet('admin:dashboard:overview', async () => {
+    const [totalUsers, totalBookings, paidPayments, byStatus] = await Promise.all([
+      usersCol().countDocuments({ role: 'user' }),
+      jobsCol().countDocuments({}),
+      paymentsCol().aggregate([
+        { $match: { status: 'paid' } },
+        { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+      ]).toArray(),
+      jobsCol().aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]).toArray(),
+    ]);
+    return {
       totalUsers,
       totalBookings,
       revenue: paidPayments[0] || { total: 0, count: 0 },
       bookingsByStatus: Object.fromEntries(byStatus.map(b => [b._id, b.count])),
-    },
-  });
+    };
+  }, 60);
+  res.json({ success: true, data });
 }));
 
 r.get('/bookings', asyncHandler(async (req, res) => {
@@ -325,28 +325,30 @@ r.get('/payments', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) 
 r.get('/payments/stats', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (_req, res) => {
   // KPIs grouped per currency so the dashboard can show "₹4.5M paid /
   // €12k paid / $3.2k paid" side by side instead of mixing currencies.
-  const [byStatus, byCurrency, mockCount, gatewayBreakdown] = await Promise.all([
-    paymentsCol().aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]).toArray(),
-    paymentsCol().aggregate([
-      { $match: { status: 'paid' } },
-      { $group: { _id: '$currency', total: { $sum: '$amount' }, count: { $sum: 1 } } },
-    ]).toArray(),
-    paymentsCol().countDocuments({ mock: true }),
-    paymentsCol().aggregate([
-      { $group: { _id: '$provider', count: { $sum: 1 }, total: { $sum: '$amount' } } },
-    ]).toArray(),
-  ]);
-  res.json({
-    success: true,
-    data: {
+  // Cached 60s — payment stats need to feel fresh on the admin home but
+  // 4× heavy aggregations per page load is wasteful at scale.
+  const data = await getOrSet('admin:payments:stats', async () => {
+    const [byStatus, byCurrency, mockCount, gatewayBreakdown] = await Promise.all([
+      paymentsCol().aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]).toArray(),
+      paymentsCol().aggregate([
+        { $match: { status: 'paid' } },
+        { $group: { _id: '$currency', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+      ]).toArray(),
+      paymentsCol().countDocuments({ mock: true }),
+      paymentsCol().aggregate([
+        { $group: { _id: '$provider', count: { $sum: 1 }, total: { $sum: '$amount' } } },
+      ]).toArray(),
+    ]);
+    return {
       countsByStatus:   Object.fromEntries(byStatus.map((s) => [s._id || 'unknown', s.count])),
       paidByCurrency:   byCurrency.map((c) => ({ currency: c._id || 'INR', total: c.total, count: c.count })),
       mockPayments:     mockCount,
       gatewayBreakdown: gatewayBreakdown.map((g) => ({ gateway: g._id || 'unknown', count: g.count, total: g.total })),
-    },
-  });
+    };
+  }, 60);
+  res.json({ success: true, data });
 }));
 
 r.get('/payments/:id', permGuard(PERMS.PAYMENT_READ), asyncHandler(async (req, res) => {
@@ -820,25 +822,35 @@ makeStaffRoutes('resource', '/resources');
 /* ─────────────────────────────────────────────────────────────
  * Admin: Dashboard sub-routes used by FE
  * ───────────────────────────────────────────────────────────── */
+// Dashboard endpoints run multiple aggregations + countDocuments and were
+// re-running on every page load. At 1M-user scale this dominated read
+// load on jobs/users/payments. Each handler now caches its payload in
+// Redis with a TTL that matches how stale the data can reasonably be:
+//   • stats        — 60s (counts changing minute by minute is fine)
+//   • revenue      — 300s (month-aggregated; new month boundaries don't
+//                          warrant per-page recomputation)
+//   • recent-activity — 30s (needs to feel live but bursting page
+//                            refreshes don't need fresh aggregates)
+// Cache misses fall through to the original aggregation; misses are
+// the first request after TTL expiry, then ~0 during the steady state.
 r.get('/dashboard/stats', asyncHandler(async (_req, res) => {
-  const [
-    totalCustomers, totalBookings, pendingBookings, activeJobs,
-    totalPMs, totalResources, paidAgg,
-  ] = await Promise.all([
-    usersCol().countDocuments({ role: 'user' }),
-    jobsCol().countDocuments({}),
-    jobsCol().countDocuments({ status: { $in: ['pending', 'confirmed'] } }),
-    jobsCol().countDocuments({ status: { $in: ['assigned_to_pm', 'in_progress'] } }),
-    usersCol().countDocuments({ role: 'pm' }),
-    usersCol().countDocuments({ role: 'resource' }),
-    jobsCol().aggregate([
-      { $match: { status: { $nin: ['cancelled'] } } },
-      { $group: { _id: null, total: { $sum: { $ifNull: ['$pricing.total', 0] } } } },
-    ]).toArray(),
-  ]);
-  res.json({
-    success: true,
-    data: {
+  const data = await getOrSet('admin:dashboard:stats', async () => {
+    const [
+      totalCustomers, totalBookings, pendingBookings, activeJobs,
+      totalPMs, totalResources, paidAgg,
+    ] = await Promise.all([
+      usersCol().countDocuments({ role: 'user' }),
+      jobsCol().countDocuments({}),
+      jobsCol().countDocuments({ status: { $in: ['pending', 'confirmed'] } }),
+      jobsCol().countDocuments({ status: { $in: ['assigned_to_pm', 'in_progress'] } }),
+      usersCol().countDocuments({ role: 'pm' }),
+      usersCol().countDocuments({ role: 'resource' }),
+      jobsCol().aggregate([
+        { $match: { status: { $nin: ['cancelled'] } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$pricing.total', 0] } } } },
+      ]).toArray(),
+    ]);
+    return {
       totalBookings,
       pendingBookings,
       activeJobs,
@@ -846,30 +858,33 @@ r.get('/dashboard/stats', asyncHandler(async (_req, res) => {
       totalCustomers,
       totalPMs,
       totalResources,
-    },
-  });
+    };
+  }, 60);
+  res.json({ success: true, data });
 }));
 
 r.get('/dashboard/revenue', asyncHandler(async (_req, res) => {
-  const since = new Date(); since.setMonth(since.getMonth() - 6);
-  const rows = await jobsCol().aggregate([
-    { $match: { status: { $nin: ['cancelled'] }, createdAt: { $gte: since } } },
-    { $group: {
-      _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-      revenue: { $sum: { $ifNull: ['$pricing.total', 0] } },
-    }},
-    { $sort: { _id: 1 } },
-  ]).toArray();
-  res.json({
-    success: true,
-    data: rows.map((r2) => ({ month: r2._id, revenue: r2.revenue })),
-  });
+  const data = await getOrSet('admin:dashboard:revenue:6m', async () => {
+    const since = new Date(); since.setMonth(since.getMonth() - 6);
+    const rows = await jobsCol().aggregate([
+      { $match: { status: { $nin: ['cancelled'] }, createdAt: { $gte: since } } },
+      { $group: {
+        _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+        revenue: { $sum: { $ifNull: ['$pricing.total', 0] } },
+      }},
+      { $sort: { _id: 1 } },
+    ]).toArray();
+    return rows.map((r2) => ({ month: r2._id, revenue: r2.revenue }));
+  }, 300);
+  res.json({ success: true, data });
 }));
 
 r.get('/dashboard/recent-activity', asyncHandler(async (_req, res) => {
-  const items = await jobsCol().find({}).sort({ createdAt: -1 }).limit(10).toArray();
-  const hydrated = await hydrateJobs(items);
-  res.json({ success: true, data: hydrated });
+  const data = await getOrSet('admin:dashboard:recent', async () => {
+    const items = await jobsCol().find({}).sort({ createdAt: -1 }).limit(10).toArray();
+    return await hydrateJobs(items);
+  }, 30);
+  res.json({ success: true, data });
 }));
 
 /* ─────────────────────────────────────────────────────────────

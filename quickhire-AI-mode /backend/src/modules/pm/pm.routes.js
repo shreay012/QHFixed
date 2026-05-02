@@ -10,6 +10,7 @@ import { AppError } from '../../utils/AppError.js';
 import { enqueueNotification } from '../notification/notification.service.js';
 import { emitTo } from '../../socket/index.js';
 import { notifyAdmins } from './pm.assign.js';
+import { getOrSet } from '../../utils/cache.js';
 
 const r = Router();
 r.use(roleGuard(['pm']));
@@ -63,24 +64,28 @@ r.get('/me', asyncHandler(async (req, res) => {
 }));
 
 r.get('/dashboard', asyncHandler(async (req, res) => {
-  const pmId = new ObjectId(req.user.id);
-  const [assigned, inProgress, paused, completed, byStatus] = await Promise.all([
-    jobsCol().countDocuments({ pmId, status: 'assigned_to_pm' }),
-    jobsCol().countDocuments({ pmId, status: 'in_progress' }),
-    jobsCol().countDocuments({ pmId, status: 'paused' }),
-    jobsCol().countDocuments({ pmId, status: 'completed' }),
-    jobsCol().aggregate([
-      { $match: { pmId } },
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]).toArray(),
-  ]);
-  res.json({
-    success: true,
-    data: {
+  // Each PM sees their own counts → cache key is per-PM. 30s TTL keeps
+  // the dashboard feeling live while collapsing five Mongo round-trips
+  // into one Redis hit on every refresh.
+  const pmIdStr = String(req.user.id);
+  const data = await getOrSet(`pm:dashboard:${pmIdStr}`, async () => {
+    const pmId = new ObjectId(pmIdStr);
+    const [assigned, inProgress, paused, completed, byStatus] = await Promise.all([
+      jobsCol().countDocuments({ pmId, status: 'assigned_to_pm' }),
+      jobsCol().countDocuments({ pmId, status: 'in_progress' }),
+      jobsCol().countDocuments({ pmId, status: 'paused' }),
+      jobsCol().countDocuments({ pmId, status: 'completed' }),
+      jobsCol().aggregate([
+        { $match: { pmId } },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]).toArray(),
+    ]);
+    return {
       assigned, inProgress, paused, completed,
       byStatus: Object.fromEntries(byStatus.map((b) => [b._id, b.count])),
-    },
-  });
+    };
+  }, 30);
+  res.json({ success: true, data });
 }));
 
 r.get('/bookings', asyncHandler(async (req, res) => {

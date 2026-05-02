@@ -85,8 +85,17 @@ export async function deleteCacheValue(keys) {
 }
 
 /**
- * Clear all keys matching a pattern
- * @param {string} pattern - Redis key pattern (e.g., "services:*")
+ * Clear all keys matching a pattern using a non-blocking SCAN cursor.
+ *
+ * The previous implementation used `redis.keys(pattern)` which is a single
+ * O(N) command that blocks the Redis main thread for the entire scan. At
+ * 1M users with hundreds of thousands of cache entries, every service
+ * edit would have frozen the queue/pubsub/auth-blocklist subsystems for
+ * tens of milliseconds while it scanned. SCAN walks the keyspace in
+ * cursor-paged chunks, yielding between batches, so other commands stay
+ * responsive while we delete.
+ *
+ * @param {string} pattern  Redis key pattern (e.g. "services:*")
  */
 export async function clearCachePattern(pattern) {
   if (!redis.status || redis.status === 'reconnecting') {
@@ -94,10 +103,19 @@ export async function clearCachePattern(pattern) {
   }
 
   try {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
+    let cursor = '0';
+    let deleted = 0;
+    do {
+      // COUNT is a hint, not a hard cap. 200 keys per round-trip keeps
+      // each SCAN call well under 1ms even on a busy Redis.
+      const [next, batch] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 200);
+      cursor = next;
+      if (batch.length > 0) {
+        await redis.unlink(...batch); // UNLINK is async-free in Redis ≥4
+        deleted += batch.length;
+      }
+    } while (cursor !== '0');
+    if (deleted > 0) logger.debug({ pattern, deleted }, 'cache pattern cleared');
     return true;
   } catch (err) {
     logger.warn({ err, pattern }, 'cache pattern clear failed');
