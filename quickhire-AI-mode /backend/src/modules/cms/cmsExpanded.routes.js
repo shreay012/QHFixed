@@ -115,59 +115,210 @@ r.delete('/pages/:id', adminGuard, permGuard(PERMS.CMS_WRITE), asyncHandler(asyn
    BANNERS
 ═══════════════════════════════════════════════════════════════ */
 
-const bannerSchema = z.object({
-  title: z.string().max(200).optional(),
-  image: z.string().url(),
-  link: z.string().optional(),
-  country: z.string().optional(),
-  segment: z.array(z.string()).default(['all']),
-  validFrom: z.string().datetime(),
-  validTo: z.string().datetime(),
-  // A/B variant: 'A' or 'B' — serve to 50% of users each
-  abVariant: z.enum(['A', 'B', 'all']).default('all'),
-  active: z.boolean().default(true),
-  position: z.enum(['hero', 'inline', 'popup', 'sidebar']).default('hero'),
+/* ───────────────── Banner schema (Phase 8 — multi-locale + slider) ────
+ *
+ * Every text-bearing field accepts EITHER a plain string (back-compat
+ * with the original schema) OR an i18n object keyed by locale, e.g.
+ *   title: { en: 'Hello', hi: 'नमस्ते', de: 'Hallo' }
+ * The frontend resolves to the active locale at render time and falls
+ * back to en → first available value if a locale is missing.
+ *
+ * Variants drive the rendering template:
+ *   simple        — Title + body + CTA over an image / video (default)
+ *   expert-match  — Title + body + CTA on the left, expert cards w/
+ *                   experience badges on the right (the "Not sure what
+ *                   you need" layout)
+ *   video-hero    — Full-bleed background video with overlaid title +
+ *                   CTA
+ *   split         — 50/50 image-or-video left, text-with-CTA right
+ *
+ * Positions cover the full customer-facing surface area; staff portals
+ * stay banner-free.
+ */
+const i18nString = z.union([z.string().max(500), z.record(z.string().max(500))]).optional();
+
+const expertSchema = z.object({
+  name:     z.string().max(100),
+  role:     z.string().max(100).optional().default(''),
+  imageUrl: z.string().url().optional(),
+  yearsOfExperience: z.coerce.number().int().min(0).max(80).optional(),
+  verified: z.boolean().optional().default(true),
 });
 
-// Public: GET /api/cms-x/banners?country=IN&position=hero
+const POSITION_ENUM = z.enum([
+  'home-hero', 'home-secondary', 'home-mid', 'home-bottom',
+  'services-top', 'service-detail-top',
+  'booking-flow-top', 'checkout-top',
+  'profile-top', 'cart-top', 'search-top',
+  // Legacy values kept for back-compat with existing DB records
+  'hero', 'inline', 'popup', 'sidebar',
+  'homepage_hero', 'homepage_mid',
+]);
+
+const bannerSchema = z.object({
+  // Internal-only label shown in the admin list. NOT shown to users.
+  internalName: z.string().max(200).optional(),
+
+  // Display fields — all accept plain string OR { locale: value } map.
+  title:     i18nString,
+  body:      i18nString,
+  ctaLabel:  i18nString,
+  ctaUrl:    z.string().max(500).optional(),
+
+  // Media: one mediaUrl + mediaType. Optional per-locale override map.
+  mediaType:       z.enum(['image', 'video']).optional().default('image'),
+  mediaUrl:        z.string().max(2000).optional(),
+  mediaUrlByLocale: z.record(z.string().max(2000)).optional(),
+
+  // Layout / behaviour
+  variant:         z.enum(['simple', 'expert-match', 'video-hero', 'split']).optional().default('simple'),
+  experts:         z.array(expertSchema).optional().default([]),
+  order:           z.coerce.number().int().optional().default(0),
+  autoplayMs:      z.coerce.number().int().min(2000).max(60000).optional(),
+
+  // Targeting
+  position:        POSITION_ENUM.optional().default('home-hero'),
+  country:         z.string().length(2).optional(),
+  segment:         z.array(z.string()).optional().default(['all']),
+  abVariant:       z.enum(['A', 'B', 'all']).optional().default('all'),
+
+  // Lifecycle
+  validFrom:       z.string().datetime().optional(),
+  validTo:         z.string().datetime().optional(),
+  active:          z.boolean().optional().default(true),
+
+  // ── Back-compat fields (original v1 schema). Old admin clients still
+  //    send these; we accept and merge them into the canonical fields
+  //    below in the create/update handlers.
+  image:    z.string().url().optional(),
+  link:     z.string().optional(),
+  imageUrl: z.string().url().optional(),
+  linkUrl:  z.string().optional(),
+  placement: z.string().optional(),
+  startsAt:  z.string().optional(),
+  endsAt:    z.string().optional(),
+});
+
+/**
+ * Normalise a banner doc on read so consumers always see the new shape
+ * regardless of what variant of admin form created the record. Old docs
+ * with `image` / `link` / `placement` / `startsAt` / `endsAt` fields are
+ * mirrored into the new `mediaUrl` / `ctaUrl` / `position` / `validFrom`
+ * / `validTo` slots so the frontend renderer doesn't need to know about
+ * the legacy field names.
+ */
+function normaliseBannerOut(doc) {
+  if (!doc) return doc;
+  const out = { ...doc };
+  if (!out.mediaUrl && (out.image || out.imageUrl)) out.mediaUrl = out.image || out.imageUrl;
+  if (!out.ctaUrl && (out.link  || out.linkUrl))    out.ctaUrl = out.link || out.linkUrl;
+  if (!out.position && out.placement) {
+    // Map legacy placement strings to the new enum values.
+    const map = { homepage_hero: 'home-hero', homepage_mid: 'home-mid', services_top: 'services-top',
+                  checkout: 'checkout-top', sidebar: 'home-secondary' };
+    out.position = map[out.placement] || out.placement;
+  }
+  if (!out.validFrom && out.startsAt) out.validFrom = out.startsAt;
+  if (!out.validTo   && out.endsAt)   out.validTo   = out.endsAt;
+  if (!out.mediaType) out.mediaType = 'image';
+  if (!out.variant)   out.variant   = 'simple';
+  return out;
+}
+
+/**
+ * Normalise an incoming write so we always store the canonical shape.
+ * Drops legacy aliases after copying their values into the new fields,
+ * which keeps the DB clean even if the client uses old field names.
+ */
+function normaliseBannerIn(body) {
+  const doc = { ...body };
+  if (!doc.mediaUrl && (doc.image || doc.imageUrl)) doc.mediaUrl = doc.image || doc.imageUrl;
+  if (!doc.ctaUrl && (doc.link || doc.linkUrl)) doc.ctaUrl = doc.link || doc.linkUrl;
+  if (!doc.position && doc.placement) {
+    const map = { homepage_hero: 'home-hero', homepage_mid: 'home-mid', services_top: 'services-top',
+                  checkout: 'checkout-top', sidebar: 'home-secondary' };
+    doc.position = map[doc.placement] || doc.placement;
+  }
+  if (!doc.validFrom && doc.startsAt) doc.validFrom = doc.startsAt;
+  if (!doc.validTo && doc.endsAt) doc.validTo = doc.endsAt;
+  // Drop legacy aliases — they're already mirrored.
+  delete doc.image; delete doc.imageUrl;
+  delete doc.link;  delete doc.linkUrl;
+  delete doc.placement;
+  delete doc.startsAt; delete doc.endsAt;
+  return doc;
+}
+
+// Public: GET /api/cms-x/banners?country=IN&position=home-hero
 r.get('/banners', asyncHandler(async (req, res) => {
   const now = new Date();
-  const filter = {
-    active: true,
-    validFrom: { $lte: now },
-    validTo: { $gte: now },
-  };
-  if (req.query.country) filter.$or = [{ country: req.query.country }, { country: { $exists: false } }];
-  if (req.query.position) filter.position = req.query.position;
+  const filter = { active: true };
+  // Lifecycle window — if validFrom/validTo are unset on a record we
+  // don't filter on them (treat the banner as always-valid).
+  filter.$and = [
+    { $or: [{ validFrom: { $lte: now } }, { validFrom: { $exists: false } }] },
+    { $or: [{ validTo:   { $gte: now } }, { validTo:   { $exists: false } }] },
+  ];
+  if (req.query.country) {
+    filter.$and.push({ $or: [{ country: req.query.country }, { country: { $exists: false } }, { country: '' }] });
+  }
+  if (req.query.position) {
+    // Match canonical + legacy placement aliases for the same surface.
+    const reverseMap = {
+      'home-hero': ['home-hero', 'hero', 'homepage_hero'],
+      'home-mid':  ['home-mid', 'homepage_mid'],
+      'services-top': ['services-top', 'services_top'],
+      'checkout-top': ['checkout-top', 'checkout'],
+      'home-secondary': ['home-secondary', 'sidebar'],
+    };
+    const want = String(req.query.position);
+    const aliases = reverseMap[want] || [want];
+    filter.$and.push({ position: { $in: aliases } });
+  }
 
-  const items = await bannersCol().find(filter).sort({ createdAt: -1 }).limit(10).toArray();
-  res.json({ success: true, data: items });
+  // Ordering: explicit `order` ascending, then newest first within same
+  // order so admins can promote a banner to the top by setting order: 0.
+  const items = await bannersCol()
+    .find(filter)
+    .sort({ order: 1, createdAt: -1 })
+    .limit(20)
+    .toArray();
+  res.json({ success: true, data: items.map(normaliseBannerOut) });
 }));
 
 // Admin: list all
 r.get('/banners/all', adminGuard, permGuard(PERMS.CMS_READ), asyncHandler(async (req, res) => {
   const p = paginate(req.query);
   const [items, total] = await Promise.all([
-    bannersCol().find({}).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
+    bannersCol().find({}).sort({ position: 1, order: 1, createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
     bannersCol().countDocuments({}),
   ]);
-  res.json({ success: true, data: items, meta: buildMeta({ page: p.page, pageSize: p.pageSize, total }) });
+  res.json({ success: true, data: items.map(normaliseBannerOut), meta: buildMeta({ page: p.page, pageSize: p.pageSize, total }) });
 }));
 
 // Admin: create banner
 r.post('/banners', adminGuard, permGuard(PERMS.CMS_WRITE), validate(bannerSchema), asyncHandler(async (req, res) => {
   const now = new Date();
-  const doc = { ...req.body, validFrom: new Date(req.body.validFrom), validTo: new Date(req.body.validTo), createdBy: new ObjectId(req.user.id), createdAt: now, updatedAt: now };
+  const body = normaliseBannerIn(req.body);
+  const doc = {
+    ...body,
+    validFrom: body.validFrom ? new Date(body.validFrom) : undefined,
+    validTo:   body.validTo   ? new Date(body.validTo)   : undefined,
+    createdBy: new ObjectId(req.user.id),
+    createdAt: now,
+    updatedAt: now,
+  };
   const ins = await bannersCol().insertOne(doc);
-  res.status(201).json({ success: true, data: { _id: ins.insertedId, ...doc } });
+  res.status(201).json({ success: true, data: normaliseBannerOut({ _id: ins.insertedId, ...doc }) });
 }));
 
 // Admin: update banner
 r.put('/banners/:id', adminGuard, permGuard(PERMS.CMS_WRITE), validate(bannerSchema.partial()), asyncHandler(async (req, res) => {
   const id = toObjectId(req.params.id);
-  const $set = { ...req.body, updatedAt: new Date() };
+  const body = normaliseBannerIn(req.body);
+  const $set = { ...body, updatedAt: new Date() };
   if ($set.validFrom) $set.validFrom = new Date($set.validFrom);
-  if ($set.validTo) $set.validTo = new Date($set.validTo);
+  if ($set.validTo)   $set.validTo   = new Date($set.validTo);
   delete $set._id;
   await bannersCol().updateOne({ _id: id }, { $set });
   res.json({ success: true });

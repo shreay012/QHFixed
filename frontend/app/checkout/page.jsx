@@ -26,6 +26,7 @@ import { paymentService } from "@/lib/services/paymentApi";
 import { usePrice } from "@/lib/hooks/usePrice";
 import { useTranslations } from "next-intl";
 import { useLegalAcceptance } from "@/components/providers/LegalAcceptanceProvider";
+import CmsBannerSlider from "@/components/cms/CmsBannerSlider";
 
 export const dynamic = "force-dynamic";
 
@@ -247,6 +248,9 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
+      {/* CMS slot: checkout-top — admin-managed urgency / promo strip
+          shown above the order-summary grid. */}
+      <CmsBannerSlider position="checkout-top" className="mb-6" />
       <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 mb-6">{t("title")}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

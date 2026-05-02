@@ -7,6 +7,7 @@ import {
   BookingFaq,
   ExpertCardV3,
 } from "@/features/booking/components";
+import CmsBannerSlider from "@/components/cms/CmsBannerSlider";
 
 export const metadata = {
   title: "Book Your Resource - QuickHire",
@@ -31,6 +32,13 @@ export default function BookResourcePage() {
   return (
     <main className="flex-1">
       <Mainbanner />
+
+      {/* CMS slot: booking-flow-top — admins can rotate booking-flow
+          promos / expert-match callouts here without touching code. */}
+      <div className="max-w-7xl mx-auto px-4 my-6">
+        <CmsBannerSlider position="booking-flow-top" />
+      </div>
+
       <ServiceSelectionGridV5 />
       <HeroSectionV3 />
       <BookYourResourceGrid />

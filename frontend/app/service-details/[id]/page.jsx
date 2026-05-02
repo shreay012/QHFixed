@@ -11,6 +11,7 @@ import { selectLocale } from "@/lib/redux/slices/regionSlice/regionSlice";
 
 import { LeftComponent, RightComponent } from "@/features/services/components";
 import CustomProgressScrollbar from "@/components/ui/CustomProgressScrollbar";
+import CmsBannerSlider from "@/components/cms/CmsBannerSlider";
 
 export default function ServiceDetailsPage() {
   const leftScrollRef = useRef(null);
@@ -94,6 +95,9 @@ export default function ServiceDetailsPage() {
             className="px-4 sm:px-6 lg:pl-0 lg:pt-0 lg:pb-0 py-6 lg:py-0"
             style={{ paddingRight: "9px" }}
           >
+            {/* CMS slot: service-detail-top — admin-managed callouts /
+                upsell banners shown above the service write-up. */}
+            <CmsBannerSlider position="service-detail-top" className="mb-6" />
             <LeftComponent selectedService={service} />
           </div>
         </div>

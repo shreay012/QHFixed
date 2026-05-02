@@ -9,6 +9,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "seed": "node src/scripts/seed.js",
+    "seed:banners": "node src/scripts/seed-banners.js",
     "worker:notifications": "node src/workers/notification.worker.js",
     "worker:invoice": "node src/workers/invoice.worker.js",
     "worker:email": "node src/workers/email.worker.js",
