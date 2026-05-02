@@ -49,10 +49,11 @@ export async function dispatch({ userId, type, title, body, data = {}, channels 
   const notification = { _id: r.insertedId, ...doc };
 
   if (channels.includes('in_app')) {
-    // Emit on both event names for frontend compatibility:
-    // - 'notification' (legacy)
-    // - 'notification:new' (current SocketProvider listener)
-    emitTo(`user_${userId}`, 'notification', notification);
+    // Single canonical event name. The legacy 'notification' alias was
+    // dropped after auditing the FE — every consumer (SocketProvider,
+    // chatSocketService, Header badge listener) listens for
+    // 'notification:new'. Double-emitting was costing ~2× the
+    // pub/sub fan-out bandwidth at scale for no functional benefit.
     emitTo(`user_${userId}`, 'notification:new', notification);
   }
 
