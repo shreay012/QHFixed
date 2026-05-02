@@ -51,6 +51,30 @@ const CODE_TO_SEGMENT = { IN: 'in', AE: 'ae', DE: 'de', US: 'us', AU: 'au' };
 /** Dev-only routes — return 404 in production */
 const DEV_ONLY_ROUTES = ['/test-chat'];
 
+/**
+ * Routes that must NEVER receive a country prefix:
+ *   • Staff portals — they have no country variants and live globally
+ *   • Auth + system routes — login, /api, Next.js internals
+ * If a request arrives at a country-prefixed staff URL (e.g. someone bookmarks
+ * /de/admin), we still serve it via the rewrite so it doesn't 404, but new
+ * navigations won't redirect into a prefix for these paths.
+ */
+const PREFIX_EXEMPT_PATHS = [
+  '/admin',
+  '/pm',
+  '/resource',
+  '/staff-login',
+  '/login',
+  '/api',
+  '/_next',
+];
+
+function isPrefixExempt(pathname) {
+  return PREFIX_EXEMPT_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + '/'),
+  );
+}
+
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
 function pickLocaleFromAcceptLanguage(header) {
@@ -180,11 +204,41 @@ export function proxy(request) {
     process.env.NEXT_PUBLIC_COUNTRY_PATH_ROUTING === 'false';
 
   if (!PATH_ROUTING_DISABLED) {
+    // ── 5a. Inbound is country-prefixed (/<code>/<rest>) — internal rewrite
+    //
+    // The Next.js app/ folder is FLAT (no `[country]` dynamic segment), so
+    // a request for `/de/about-us` would 404 without intervention. We
+    // therefore strip the country segment server-side and rewrite to the
+    // flat path while keeping the URL the user sees unchanged. Combined
+    // with step 5b below this gives us the full path-prefix UX described
+    // in docs/global-platform/02-url-domain-strategy.md without having to
+    // duplicate every page under app/[country]/.
+    if (pathSegment) {
+      // /de       → /
+      // /de/      → /
+      // /de/foo/bar → /foo/bar
+      let strippedPath = pathname.slice(`/${pathSegment}`.length);
+      if (!strippedPath || strippedPath === '/') strippedPath = '/';
+
+      const rewriteUrl = new URL(strippedPath, request.url);
+      rewriteUrl.search = searchParams.toString();
+
+      const res = NextResponse.rewrite(rewriteUrl);
+      res.cookies.set('qh_country', detectedCountry, COOKIE_OPTS);
+      if (!cookieLocale || countryChanged) res.cookies.set('qh_locale', locale, COOKIE_OPTS);
+      if (!cookieCurrency || countryChanged) res.cookies.set('qh_currency', currency, COOKIE_OPTS);
+      res.headers.set('x-qh-country', detectedCountry);
+      res.headers.set('x-qh-locale', locale);
+      res.headers.set('x-qh-currency', currency);
+      return res;
+    }
+
+    // ── 5b. No country prefix yet — redirect non-IN markets so the URL
+    //       reflects the user's market.
     const shouldPrefix =
-      !pathSegment &&
       detectedCountry !== 'IN' &&            // ← India served at root
       CODE_TO_SEGMENT[detectedCountry] &&
-      !pathname.startsWith('/api/') &&
+      !isPrefixExempt(pathname) &&
       pathname !== '/404' &&
       pathname !== '/500';
 
@@ -202,9 +256,8 @@ export function proxy(request) {
     }
 
     // Inverse case: an Indian visitor lands on a country-prefixed URL
-    // (e.g. they manually typed /ae/) — leave the URL alone but make sure
-    // the cookie still matches the path so subsequent navigation is
-    // consistent. This is handled by step 6 below.
+    // (e.g. they manually typed /ae/) — handled by 5a above (rewrite).
+    // An Indian visitor on a non-prefixed path passes through to step 6.
   }
 
   // ── 6. Pass through: set cookies + inject geo headers ────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/common/I18nLink";
 import Image from "next/image";
 import { Box, Typography, Grid, Container } from "@mui/material";
 import { useTranslations } from "next-intl";

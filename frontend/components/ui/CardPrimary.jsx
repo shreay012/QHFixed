@@ -2,13 +2,13 @@
 
 import ArrowOutwardIcon from "@mui/icons-material/ArrowOutward";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useI18nRouter } from "@/lib/hooks/useI18nRouter";
 import { useTranslations } from "next-intl";
 import { getServiceIcon } from "@/lib/utils/serviceIcon";
 import { useCmsTranslate } from "@/lib/i18n/useCmsTranslate";
 
 const CardPrimary = ({ card }) => {
-  const router = useRouter();
+  const router = useI18nRouter();
   const tCommon = useTranslations("common");
   const tCms = useCmsTranslate();
   // console.log("Card Data:", card);
@@ -32,8 +32,10 @@ const CardPrimary = ({ card }) => {
     if (card?._id) {
       // Store the selected service in sessionStorage
       sessionStorage.setItem("selectedService", JSON.stringify(card));
-      // Navigate to the service details page
-      router.push(`/service-details/${card._id}`);
+      // Navigate to the service details page — prefer the SEO-friendly slug
+      // when present, fall back to the Mongo _id (backend route accepts both).
+      const segment = card.slug || card._id;
+      router.push(`/service-details/${segment}`);
     }
   };
 

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useI18nRouter } from '@/lib/hooks/useI18nRouter';
 import { useTranslations } from 'next-intl';
 import { useCmsTranslate } from '@/lib/i18n/useCmsTranslate';
 
@@ -20,29 +20,20 @@ const TechnologyPill = ({ label }) => (
 );
 
 const ServiceCardGridV3 = ({ service, backgroundColor, iconUrl }) => {
-  const router = useRouter();
+  const router = useI18nRouter();
   const tServiceDetails = useTranslations('serviceDetails');
   const tCms = useCmsTranslate();
 
   const displayedTechs = service.technologies?.slice(0, 7) || [];
 
-  const handleBookNow = () => {
-    if (service?._id) {
-      // Store the selected service in sessionStorage
-      sessionStorage.setItem("selectedService", JSON.stringify(service));
-      // Navigate to the service details page
-      router.push(`/service-details/${service._id}`);
-    }
+  const navigateToService = () => {
+    if (!service?._id) return;
+    sessionStorage.setItem("selectedService", JSON.stringify(service));
+    router.push(`/service-details/${service.slug || service._id}`);
   };
 
-  const handleViewAll = () => {
-    if (service?._id) {
-      // Store the selected service in sessionStorage
-      sessionStorage.setItem("selectedService", JSON.stringify(service));
-      // Navigate to the service details page to see all technologies
-      router.push(`/service-details/${service._id}`);
-    }
-  };
+  const handleBookNow = navigateToService;
+  const handleViewAll = navigateToService;
 
   return (
     <div 

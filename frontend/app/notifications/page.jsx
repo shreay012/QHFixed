@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useI18nRouter } from "@/lib/hooks/useI18nRouter";
 import { notificationsService } from "@/lib/services/notificationsApi";
 import chatSocketService from "@/lib/services/chatSocketService";
 import {
@@ -41,7 +41,7 @@ function normalize(n) {
 
 export default function NotificationsPage() {
   const t = useTranslations("notifications");
-  const router = useRouter();
+  const router = useI18nRouter();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 

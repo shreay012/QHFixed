@@ -1,7 +1,7 @@
 "use client";
 import { CardPrimary } from "@/components/ui";
 import Button from "@mui/material/Button";
-import Link from "next/link";
+import Link from "@/components/common/I18nLink";
 import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/store/hooks";
 import { fetchAllServices } from "@/lib/redux/slices/discoverSlice/discoverserviceSlice";

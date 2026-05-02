@@ -2,7 +2,7 @@
 
 import { Box, Button, Typography } from "@mui/material";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/common/I18nLink";
 import { useTranslations } from "next-intl";
 
 const HireWithConfidence = () => {

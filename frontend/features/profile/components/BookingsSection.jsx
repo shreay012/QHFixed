@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useRouter } from 'next/navigation';
+import { useI18nRouter } from '@/lib/hooks/useI18nRouter';
 import { useTranslations } from 'next-intl';
 import { fetchOngoingBookings, fetchCompletedBookings } from '@/lib/redux/slices/bookingSlice/bookingSlice';
 import { getServiceIcon } from '@/lib/utils/serviceIcon';
@@ -11,7 +11,7 @@ import Image from 'next/image';
 
 const BookingsSection = () => {
   const dispatch = useDispatch();
-  const router = useRouter();
+  const router = useI18nRouter();
   const t = useTranslations('bookingsSection');
   const tBooking = useTranslations('booking');
   const [activeTab, setActiveTab] = useState('ongoing');
@@ -53,7 +53,7 @@ const BookingsSection = () => {
       // Store the selected service in sessionStorage
       sessionStorage.setItem("selectedService", JSON.stringify(serviceData));
       // Navigate to the service details page
-      router.push(`/service-details/${serviceData._id}`);
+      router.push(`/service-details/${serviceData.slug || serviceData._id}`);
     }
   };
 

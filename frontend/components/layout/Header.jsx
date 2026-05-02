@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import Link from "@/components/common/I18nLink";
+import { usePathname } from "next/navigation";
+import { useI18nRouter } from "@/lib/hooks/useI18nRouter";
 import Image from "next/image";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
@@ -10,7 +11,7 @@ import chatSocketService from "@/lib/services/chatSocketService";
 
 const Header = () => {
   const pathname = usePathname();
-  const router = useRouter();
+  const router = useI18nRouter();
   const t = useTranslations("header");
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -148,9 +149,12 @@ const Header = () => {
     router.replace("/");
   };
 
+  // Strip an optional country segment (/in /ae /de /us /au) so menu
+  // highlighting works the same on /about-us and /de/about-us.
+  const normalizedPath = (pathname || "/").replace(/^\/(in|ae|de|us|au)(?=\/|$)/i, "") || "/";
   const isMenuItemActive = (path) => {
-    if (path === "/") return pathname === "/";
-    return pathname.startsWith(path);
+    if (path === "/") return normalizedPath === "/";
+    return normalizedPath.startsWith(path);
   };
 
   const menuItems = [

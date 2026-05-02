@@ -218,7 +218,7 @@
 
 import { ButtonPrimary } from "@/components/ui";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/common/I18nLink";
 import Button from "@mui/material/Button";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useState, useEffect } from "react";
@@ -381,11 +381,11 @@ const HeroSection = () => {
                   <ServiceCardSkeleton key={index} />
                 ))
               : servicesList.slice(0, 9).map((svc) => {
-                  const { name, _id } = svc;
+                  const { name, _id, slug } = svc;
                   const iconSrc = getServiceIcon(svc);
                   return (
                     <Link
-                      href={`/service-details/${_id}`}
+                      href={`/service-details/${slug || _id}`}
                       key={_id}
                       onClick={() => {
                         sessionStorage.setItem(

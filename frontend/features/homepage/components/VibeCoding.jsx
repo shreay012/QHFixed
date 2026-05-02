@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/common/I18nLink";
 import { useTranslations } from "next-intl";
 
 const VibeCoding = () => {

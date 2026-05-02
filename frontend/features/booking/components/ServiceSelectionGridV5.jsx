@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import ServiceCardGridV3 from "./ServiceCardGridV3";
-import { useRouter } from "next/navigation";
+import { useI18nRouter } from "@/lib/hooks/useI18nRouter";
 import { useTranslations } from "next-intl";
 
 import { useAppDispatch, useAppSelector } from "@/lib/redux/store/hooks";
@@ -42,7 +42,7 @@ const ServiceSelectionGridV5 = () => {
   const initialCount = 6;
   const dropdownRef = useRef(null);
 
-  const router = useRouter();
+  const router = useI18nRouter();
 
   const dispatch = useAppDispatch();
   const { allServices, isLoading, error } = useAppSelector(
@@ -67,7 +67,7 @@ const ServiceSelectionGridV5 = () => {
     setInitialService(service.name);
     sessionStorage.setItem("selectedService", JSON.stringify(service));
     setIsDropdownOpen(false);
-    router.push(`/service-details/${service._id}`);
+    router.push(`/service-details/${service.slug || service._id}`);
   };
 
   useEffect(() => {

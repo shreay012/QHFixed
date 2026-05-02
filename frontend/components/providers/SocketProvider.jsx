@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import chatSocketService from '@/lib/services/chatSocketService';
 import { getCurrentUser } from '@/lib/utils/userHelpers';
 import { resolveNotificationRoute } from '@/lib/utils/notificationRoute';
+import { withCountryPrefix } from '@/lib/utils/i18nLink';
 import {
   playNotificationSound,
   unlockNotificationSound,
@@ -153,7 +154,12 @@ export function SocketProvider({ children }) {
     // current role — e.g. a CHAT_MESSAGE for booking #123 lands a customer
     // on /booking-ongoing/123 but a PM on /pm/bookings/123.
     const role = userStateRef.current?.user?.role || 'user';
-    const targetRoute = resolveNotificationRoute(data, role);
+    // Apply the active country prefix so an in-DE user clicking a toast on
+     // any page lands on /de/booking-ongoing/<id> directly instead of being
+     // redirected by the proxy.
+    const baseRoute = resolveNotificationRoute(data, role);
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+    const targetRoute = withCountryPrefix(baseRoute, currentPath);
     // Render via react-hot-toast (the global <Toaster /> is mounted in
     // ClientProviders). Custom node so we can show title + body.
     toast.custom(
