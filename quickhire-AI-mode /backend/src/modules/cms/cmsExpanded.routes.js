@@ -329,6 +329,24 @@ r.delete('/banners/:id', adminGuard, permGuard(PERMS.CMS_WRITE), asyncHandler(as
   res.json({ success: true });
 }));
 
+/**
+ * Admin: drop the starter banner set into cms_banners. Same idempotent
+ * upsert that runs at first boot — admins can re-trigger via the empty
+ * state CTA when they wipe the collection or want to refresh the
+ * starter copy. `force: true` re-runs even when banners already exist
+ * (default: skip if any banner is present so we don't trample custom
+ * content).
+ */
+r.post('/banners/seed', adminGuard, permGuard(PERMS.CMS_WRITE), asyncHandler(async (req, res) => {
+  const { seedStarterBanners, seedStarterBannersIfEmpty } = await import('../../scripts/seed-banners.js');
+  if (req.body?.force === true) {
+    const result = await seedStarterBanners(getDb());
+    return res.json({ success: true, data: { mode: 'force', ...result } });
+  }
+  const result = await seedStarterBannersIfEmpty(getDb());
+  res.json({ success: true, data: { mode: 'if-empty', ...result } });
+}));
+
 /* ═══════════════════════════════════════════════════════════════
    NOTIFICATION TEMPLATES
 ═══════════════════════════════════════════════════════════════ */

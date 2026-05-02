@@ -1,26 +1,21 @@
 /**
  * Banner seed script — populates cms_banners with starter banners that
  * admins can edit/duplicate immediately. Idempotent: each banner is
- * upserted on its `internalName` so re-running this script just refreshes
- * existing seed records and won't create duplicates.
+ * upserted on its `internalName` so re-running is safe.
  *
- * Run via:
- *   node src/scripts/seed-banners.js
- *
- * Banners shipped:
- *   1. "Not sure what you need?"  — expert-match variant, home-secondary
- *   2. "Find a developer in 60s"   — simple variant, home-mid
- *   3. "Tell us about your project" — split variant, services-top
- *
- * The expert-match banner mirrors the design the founder shared so the
- * homepage already shows something the moment the slider component goes
- * live; admin can then edit copy / experts / media in place.
+ * Two entry points:
+ *   • CLI:  `node src/scripts/seed-banners.js` (or `npm run seed:banners`)
+ *           — runs on whatever Mongo the env points at and exits.
+ *   • Programmatic:  import { STARTER_BANNERS, seedStarterBanners,
+ *           seedStarterBannersIfEmpty } from './seed-banners.js'
+ *           — used by db.js (boot-time auto-seed when collection is empty)
+ *           and by the admin "Seed starter banners" endpoint.
  */
 import 'dotenv/config';
 import { connectDb, closeDb, getDb } from '../config/db.js';
 import { logger } from '../config/logger.js';
 
-const BANNERS = [
+export const STARTER_BANNERS = [
   {
     internalName: 'Home — Not sure what you need?',
     position: 'home-secondary',
@@ -101,13 +96,18 @@ const BANNERS = [
   },
 ];
 
-async function run() {
-  await connectDb();
-  const db = getDb();
+/**
+ * Idempotently upsert STARTER_BANNERS into cms_banners. Always safe to
+ * re-run — each banner is keyed on its `internalName` so existing
+ * records are refreshed (NOT duplicated).
+ *
+ * @param {import('mongodb').Db} db
+ * @returns {Promise<{ upserted: number, modified: number, total: number }>}
+ */
+export async function seedStarterBanners(db) {
   const col = db.collection('cms_banners');
-
   let upserted = 0, modified = 0;
-  for (const banner of BANNERS) {
+  for (const banner of STARTER_BANNERS) {
     const result = await col.replaceOne(
       { internalName: banner.internalName },
       { ...banner, updatedAt: new Date(), createdAt: new Date() },
@@ -116,11 +116,43 @@ async function run() {
     if (result.upsertedCount) upserted++;
     else if (result.modifiedCount) modified++;
   }
-  logger.info({ upserted, modified, total: BANNERS.length }, 'banner seed complete');
-  await closeDb();
+  return { upserted, modified, total: STARTER_BANNERS.length };
 }
 
-run().catch((err) => {
-  logger.fatal({ err }, 'banner seed failed');
-  process.exit(1);
-});
+/**
+ * Boot-time auto-seed: if cms_banners is empty, drop the starter set in
+ * so the admin opens to a populated CMS instead of "no banners yet" the
+ * very first time the app comes up. No-op if any banners already exist
+ * — including custom banners admins added themselves.
+ */
+export async function seedStarterBannersIfEmpty(db) {
+  try {
+    const col = db.collection('cms_banners');
+    const existing = await col.countDocuments({});
+    if (existing > 0) return { skipped: true, existing };
+    const result = await seedStarterBanners(db);
+    logger.info({ ...result }, 'cms_banners auto-seeded with starter set');
+    return { skipped: false, ...result };
+  } catch (err) {
+    // Non-fatal — admin can re-run via /cms-x/banners/seed if needed.
+    logger.warn({ err: err.message }, 'auto-seed of cms_banners failed (non-fatal)');
+    return { skipped: true, error: err.message };
+  }
+}
+
+// CLI entry point — only runs when this file is invoked directly via
+// `node src/scripts/seed-banners.js`, not when imported.
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  (async () => {
+    try {
+      await connectDb();
+      const result = await seedStarterBanners(getDb());
+      logger.info({ ...result }, 'banner seed complete');
+      await closeDb();
+    } catch (err) {
+      logger.fatal({ err }, 'banner seed failed');
+      process.exit(1);
+    }
+  })();
+}

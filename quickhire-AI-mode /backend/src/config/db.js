@@ -46,6 +46,16 @@ export async function connectDb() {
 
   await ensureIndexes(db);
   await seedCountries(db);  // upsert canonical country configs on every boot
+  // First-boot only: drop starter banners into cms_banners if it's empty
+  // so the admin opens to populated content instead of an empty list.
+  // Wrapped in dynamic import to avoid a circular dep (seed file
+  // imports from this module via `getDb`).
+  try {
+    const { seedStarterBannersIfEmpty } = await import('../scripts/seed-banners.js');
+    await seedStarterBannersIfEmpty(db);
+  } catch (err) {
+    logger.warn({ err: err.message }, 'banner auto-seed import failed (non-fatal)');
+  }
   return db;
 }
 

@@ -691,6 +691,13 @@ export default function AdminBannersPage() {
       key: 'actions', label: 'Actions',
       render: (r) => (
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setPreviewBanner(r)} title="Preview">
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx={12} cy={12} r={3} stroke="currentColor" strokeWidth={1.8} />
+            </svg>
+            Preview
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setModalBanner(r)}>Edit</Button>
           <Button size="sm" variant="danger" onClick={() => setDeleteTarget(r)}>Delete</Button>
         </div>
@@ -698,11 +705,49 @@ export default function AdminBannersPage() {
     },
   ];
 
+  // Triggers the backend's idempotent starter-banner seed. Used both
+  // by the empty-state CTA (no banners at all) and by the toolbar
+  // button (in case admin wiped the collection and wants the starters
+  // back). The endpoint short-circuits when records already exist
+  // unless `force=true` is sent.
+  const seedStarterBanners = async (force = false) => {
+    try {
+      const r = await staffApi.post('/cms-x/banners/seed', { force });
+      const inserted = r.data?.data?.upserted ?? 0;
+      const skipped  = r.data?.data?.skipped;
+      if (skipped) {
+        showSuccess('Starter banners already present — no changes made.');
+      } else {
+        showSuccess(`Seeded ${inserted} starter banner${inserted === 1 ? '' : 's'}.`);
+      }
+      load();
+    } catch (e) {
+      showError(e?.response?.data?.error?.message || 'Failed to seed starter banners.');
+    }
+  };
+
+  // Detail row clicked from the table → preview pane on the right.
+  // We render the banner using the actual <CmsBannerSlider>-style
+  // template so the admin sees exactly what users see, not a separate
+  // "admin preview" approximation that drifts from production.
+  const [previewBanner, setPreviewBanner] = useState(null);
+
   return (
     <div>
       <PageHeader
         title="Banners"
         subtitle="Multi-locale, multi-page banner & slider system"
+        helpText="Click a row's 'Preview' to see exactly how it renders to users. Use 'View live site' to open the homepage in a new tab and verify against production."
+        secondaryActions={[
+          <Button
+            key="live"
+            variant="subtle"
+            size="md"
+            onClick={() => window.open('/', '_blank', 'noopener,noreferrer')}
+          >
+            View live site ↗
+          </Button>,
+        ]}
         action={
           <Button variant="primary" size="md" onClick={() => setModalBanner(null)}>+ New Banner</Button>
         }
@@ -711,7 +756,7 @@ export default function AdminBannersPage() {
       <div className="p-4 sm:p-8 space-y-4">
         <ErrorBox error={error} />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <label className="text-xs font-open-sauce-semibold text-[#26472B]">Filter by position:</label>
           <select
             value={filterPosition}
@@ -726,18 +771,53 @@ export default function AdminBannersPage() {
               {filtered?.length ?? 0} / {banners.length} banner{banners.length === 1 ? '' : 's'}
             </span>
           )}
+          {banners != null && banners.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => seedStarterBanners(false)}>
+              Re-seed starters
+            </Button>
+          )}
         </div>
 
         {banners === null && !error && <Spinner />}
 
         {banners !== null && (filtered?.length ?? 0) === 0 && (
-          <EmptyState message={filterPosition ? `No banners at "${POSITION_LABEL[filterPosition]}".` : 'No banners yet. Create your first promotional banner.'} />
+          <EmptyState
+            title={filterPosition ? `No banners at "${POSITION_LABEL[filterPosition]}"` : 'No banners yet'}
+            description={
+              filterPosition
+                ? "Try clearing the position filter or create a new banner for this slot."
+                : 'Drop in our 3 starter banners to see how the system works, then edit / duplicate them. Or create your first banner from scratch.'
+            }
+            action={
+              !filterPosition ? (
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <Button variant="primary" size="md" onClick={() => seedStarterBanners(false)}>
+                    Seed starter banners
+                  </Button>
+                  <Button variant="subtle" size="md" onClick={() => setModalBanner(null)}>
+                    Create from scratch
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="subtle" size="md" onClick={() => setFilterPosition('')}>
+                  Show all positions
+                </Button>
+              )
+            }
+          />
         )}
 
         {banners !== null && (filtered?.length ?? 0) > 0 && (
           <Table columns={columns} rows={filtered} keyField="_id" />
         )}
       </div>
+
+      {/* Live preview modal — renders the banner using the same slider
+          template the public site uses so admin sees exactly the user
+          experience, including locale resolution and variant layout. */}
+      {previewBanner && (
+        <BannerPreviewModal banner={previewBanner} onClose={() => setPreviewBanner(null)} />
+      )}
 
       {modalBanner !== undefined && (
         <BannerModal
@@ -754,6 +834,262 @@ export default function AdminBannersPage() {
           onConfirm={handleDelete}
           busy={deleteBusy}
         />
+      )}
+    </div>
+  );
+}
+
+/* ── Banner preview modal ──────────────────────────────────────────────
+ *
+ * Renders the banner using the same template the public site uses, so
+ * the admin sees exactly what users see — including locale resolution,
+ * variant layout, and media rendering — without us re-implementing the
+ * preview logic and risking drift from production.
+ *
+ * The locale picker lets admins flip through every locale that has any
+ * field translated, so they can spot-check Hindi / Arabic / German
+ * before publishing without changing their browser cookie.
+ */
+function BannerPreviewModal({ banner, onClose }) {
+  const allLocaleCodes = useMemo(() => {
+    const codes = new Set();
+    for (const field of ['title', 'body', 'ctaLabel']) {
+      const v = banner?.[field];
+      if (v && typeof v === 'object') {
+        for (const k of Object.keys(v)) if (v[k]) codes.add(k);
+      }
+    }
+    if (codes.size === 0) codes.add('en');
+    return [...codes];
+  }, [banner]);
+
+  const [locale, setLocale] = useState(allLocaleCodes[0] || 'en');
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px] px-4 py-8"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-5xl bg-white rounded-2xl border border-[#E5F1E2] shadow-[0_24px_64px_rgba(38,71,43,0.20)] overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5F1E2] bg-[#F2F9F1]">
+          <div>
+            <h2 className="text-base font-open-sauce-bold text-[#26472B]">Live preview</h2>
+            <p className="text-xs font-open-sauce text-[#636363] mt-0.5">
+              Exactly what the user sees on the public site for the chosen locale.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Locale switcher */}
+            {allLocaleCodes.length > 1 && (
+              <div className="flex items-center gap-1 bg-white rounded-lg border border-[#E5F1E2] p-1">
+                {allLocaleCodes.map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setLocale(code)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-open-sauce-semibold uppercase ${
+                      locale === code ? 'bg-[#45A735] text-white' : 'text-[#636363] hover:text-[#26472B]'
+                    }`}
+                  >
+                    {code}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#E5F1E2] text-[#636363] hover:text-[#26472B] transition-colors"
+              aria-label="Close"
+            >
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Preview surface — slightly off-white so banners with light
+            backgrounds still register against the modal frame. */}
+        <div className="flex-1 overflow-y-auto bg-[#F5F7F5] p-6">
+          <BannerPreviewSurface banner={banner} locale={locale} />
+        </div>
+
+        <div className="px-6 py-3 border-t border-[#E5F1E2] flex items-center justify-between text-[11px] text-[#909090] font-open-sauce">
+          <span>Position: <span className="text-[#26472B] font-open-sauce-semibold">{banner.position || '—'}</span></span>
+          <span>Variant: <span className="text-[#26472B] font-open-sauce-semibold">{banner.variant || 'simple'}</span></span>
+          <span>{banner.active ? 'Active' : 'Inactive'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Rendering primitives — copy of the public CmsBannerSlider's variant
+ * renderers, with explicit `locale` prop instead of cookie reading. We
+ * inline these rather than import the public component so the modal
+ * never has to mount a working slider (autoplay, dots, hover handlers)
+ * just to show one frame.
+ */
+function pickI18n(value, locale) {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    if (value[locale]) return value[locale];
+    if (value.en) return value.en;
+    const firstKey = Object.keys(value).find((k) => value[k]);
+    return firstKey ? value[firstKey] : '';
+  }
+  return String(value);
+}
+
+function pickMediaUrl(banner, locale) {
+  if (banner.mediaUrlByLocale && typeof banner.mediaUrlByLocale === 'object') {
+    if (banner.mediaUrlByLocale[locale]) return banner.mediaUrlByLocale[locale];
+    if (banner.mediaUrlByLocale.en)      return banner.mediaUrlByLocale.en;
+  }
+  return banner.mediaUrl || banner.image || banner.imageUrl || '';
+}
+
+function BannerPreviewSurface({ banner, locale }) {
+  const variant = banner.variant || 'simple';
+  const title = pickI18n(banner.title, locale);
+  const body  = pickI18n(banner.body, locale);
+  const cta   = pickI18n(banner.ctaLabel, locale);
+  const media = pickMediaUrl(banner, locale);
+
+  if (variant === 'expert-match') {
+    return (
+      <div className="bg-white rounded-3xl shadow-md ring-1 ring-[#E5F1E2] overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-2 items-stretch">
+          <div className="p-8 sm:p-10 flex flex-col justify-center gap-5">
+            {title && (
+              <h2 className="text-3xl sm:text-4xl font-open-sauce-bold text-[#1F2937] leading-tight whitespace-pre-line">
+                {title.split(/\\n|\n/).map((line, i) => (
+                  <span key={i} className={i > 0 ? 'block text-[#45A735]' : 'block'}>{line}</span>
+                ))}
+              </h2>
+            )}
+            {body && <p className="text-base text-[#636363] leading-relaxed max-w-xl">{body}</p>}
+            {cta && (
+              <span className="inline-flex self-start items-center justify-center px-6 py-3 rounded-lg bg-[#45A735] text-white font-open-sauce-semibold text-base">
+                {cta}
+              </span>
+            )}
+          </div>
+          <div className="relative bg-gradient-to-br from-[#F7FBF6] via-white to-[#EDF6E9] p-6 sm:p-8 flex items-center justify-center gap-4 min-h-[280px]">
+            {(banner.experts || []).slice(0, 2).map((e, idx) => (
+              <PreviewExpertCard key={idx} expert={e} />
+            ))}
+            {(!banner.experts || banner.experts.length === 0) && (
+              <span className="text-sm text-[#909090]">No experts configured</span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'video-hero') {
+    return (
+      <div className="relative bg-[#0F1F12] rounded-3xl overflow-hidden min-h-[300px] sm:min-h-[420px]">
+        {media && (
+          <video src={media} className="absolute inset-0 w-full h-full object-cover opacity-70" autoPlay muted loop playsInline />
+        )}
+        <div className="relative z-10 p-10 sm:p-14 flex flex-col justify-end h-full text-white gap-4 min-h-[300px]">
+          {title && <h2 className="text-3xl sm:text-5xl font-open-sauce-bold leading-tight">{title}</h2>}
+          {cta && (
+            <span className="inline-flex self-start items-center px-6 py-3 rounded-lg bg-white text-[#26472B] font-open-sauce-semibold">
+              {cta}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'split') {
+    return (
+      <div className="bg-white rounded-3xl shadow-md ring-1 ring-[#E5F1E2] overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-2">
+          {media && (
+            <div className="relative min-h-[260px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={media} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="p-8 sm:p-10 flex flex-col justify-center gap-4">
+            {title && <h2 className="text-2xl sm:text-3xl font-open-sauce-bold text-[#1F2937] leading-tight">{title}</h2>}
+            {body && <p className="text-base text-[#636363] leading-relaxed">{body}</p>}
+            {cta && (
+              <span className="inline-flex self-start items-center px-6 py-3 rounded-lg bg-[#45A735] text-white font-open-sauce-semibold">
+                {cta}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // simple (default)
+  return (
+    <div className="bg-white rounded-3xl shadow-md ring-1 ring-[#E5F1E2] overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 items-stretch">
+        <div className="p-8 sm:p-10 flex flex-col justify-center gap-4">
+          {title && <h2 className="text-2xl sm:text-3xl lg:text-4xl font-open-sauce-bold text-[#1F2937] leading-tight">{title}</h2>}
+          {body && <p className="text-base text-[#636363] leading-relaxed max-w-xl">{body}</p>}
+          {cta && (
+            <span className="inline-flex self-start items-center px-6 py-3 rounded-lg bg-[#45A735] text-white font-open-sauce-semibold">
+              {cta}
+            </span>
+          )}
+        </div>
+        {media && (
+          <div className="relative min-h-[220px] lg:min-h-[320px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={media} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PreviewExpertCard({ expert }) {
+  return (
+    <div className="relative">
+      <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-full overflow-hidden bg-white ring-4 ring-white shadow-lg">
+        {expert.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={expert.imageUrl} alt={expert.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#45A735] to-[#26472B] flex items-center justify-center text-white font-open-sauce-bold text-2xl">
+            {(expert.name || '?').slice(0, 1).toUpperCase()}
+          </div>
+        )}
+      </div>
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-gradient-to-t from-black/60 to-transparent text-white text-center pt-6 pb-2 px-4 w-full rounded-b-full pointer-events-none">
+        <div className="text-sm font-open-sauce-semibold">{expert.name}</div>
+        {expert.role && <div className="text-[10px] text-white/85">{expert.role}</div>}
+      </div>
+      {typeof expert.yearsOfExperience === 'number' && (
+        <div className="absolute -top-3 -right-2 sm:-right-4 flex items-center gap-2 bg-[#F7FBF6] text-[#26472B] rounded-full px-3 py-1.5 shadow-md ring-1 ring-black/5">
+          <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#78EB54] text-[#0F3B0F] text-sm font-open-sauce-bold">
+            {expert.yearsOfExperience}
+          </span>
+          <span className="text-[10px] font-open-sauce-semibold leading-tight">
+            Year Of<br />Experience
+          </span>
+        </div>
       )}
     </div>
   );
