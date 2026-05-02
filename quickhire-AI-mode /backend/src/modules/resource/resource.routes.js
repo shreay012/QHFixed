@@ -108,6 +108,27 @@ r.get('/assignments', asyncHandler(async (req, res) => {
   const p = paginate(req.query);
   const filter = { resourceId: new ObjectId(req.user.id) };
   if (req.query.status) filter.status = String(req.query.status);
+
+  // Free-text search across customer name / mobile / email and full or
+  // partial 24-char booking _id, mirroring /pm/bookings. Lets a resource
+  // working dozens of jobs find a single booking without paging.
+  const q = String(req.query.q || '').trim();
+  if (q) {
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(safe, 'i');
+    const orParts = [
+      { customerName: re },
+      { customerMobile: re },
+      { customerEmail: re },
+    ];
+    if (/^[0-9a-f]{24}$/i.test(q)) {
+      try { orParts.push({ _id: new ObjectId(q) }); } catch { /* ignore */ }
+    } else if (/^[0-9a-f]{4,23}$/i.test(q)) {
+      orParts.push({ $expr: { $regexMatch: { input: { $toString: '$_id' }, regex: re } } });
+    }
+    filter.$or = orParts;
+  }
+
   const [items, total] = await Promise.all([
     jobsCol().find(filter).sort({ createdAt: -1 }).skip(p.skip).limit(p.limit).toArray(),
     jobsCol().countDocuments(filter),
