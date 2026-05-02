@@ -10,6 +10,7 @@ import {
   Spinner,
   ErrorBox,
   Button,
+  EmptyState,
 } from '@/components/staff/ui';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -260,6 +261,7 @@ export default function AdminUsersPage() {
       <PageHeader
         title="Users"
         subtitle="Manage all platform users — customers, PMs, and resources"
+        helpText="Use the role tabs to filter. Search matches name, mobile, and email. Suspending a user blocks login but preserves their bookings."
       />
 
       {/* Role tab pills */}
@@ -322,12 +324,26 @@ export default function AdminUsersPage() {
 
         {/* Table */}
         {items === null && !error && <Spinner />}
-        {items !== null && (
+        {items !== null && filteredItems.length === 0 && (
+          <EmptyState
+            title={search ? 'No users match this search' : `No ${role || 'users'} yet`}
+            description={
+              search
+                ? `Search for "${search}" returned no matches. Note: search runs on the current page only — clear it or paginate to find a specific user.`
+                : 'Users register through the customer signup flow. Staff (PMs / resources) are added from their respective admin pages.'
+            }
+            action={search && (
+              <Button variant="subtle" size="md" onClick={() => setSearch('')}>
+                Clear search
+              </Button>
+            )}
+          />
+        )}
+        {items !== null && filteredItems.length > 0 && (
           <Table
             columns={columns}
             rows={filteredItems}
             keyField="_id"
-            empty="No users found matching your criteria."
           />
         )}
 

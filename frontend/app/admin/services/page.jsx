@@ -7,7 +7,7 @@ import staffApi from '@/lib/axios/staffApi';
 import { showError, showSuccess } from '@/lib/utils/toast';
 import {
   PageHeader, Spinner, ErrorBox, Button, Table,
-  SearchInput, Select, Pagination, SectionCard,
+  SearchInput, Select, Pagination, SectionCard, EmptyState,
 } from '@/components/staff/ui';
 
 const PAGE_SIZE = 20;
@@ -169,6 +169,7 @@ export default function AdminServicesPage() {
       <PageHeader
         title={t('title')}
         subtitle={t('subtitle')}
+        helpText="Services power the entire booking catalogue. Edit copy / pricing / FAQs without a deploy."
         action={
           <Button variant="primary" onClick={() => router.push('/admin/services/new')}>
             + New Service
@@ -176,7 +177,10 @@ export default function AdminServicesPage() {
         }
       />
       <div className="p-4 sm:p-8 space-y-4">
-        <SectionCard title="Filters">
+        <SectionCard
+          title="Filters"
+          description="Narrow by name, slug, or active state."
+        >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <SearchInput
               value={q}
@@ -195,9 +199,30 @@ export default function AdminServicesPage() {
         </SectionCard>
         <ErrorBox error={error} />
         {items === null && !error && <Spinner />}
-        {items !== null && (
+        {items !== null && items.length === 0 && (
+          <EmptyState
+            title={q || activeFilter ? 'No services match these filters' : 'No services yet'}
+            description={
+              q || activeFilter
+                ? 'Try clearing the search or active filter.'
+                : 'Create your first service to start accepting bookings.'
+            }
+            action={
+              q || activeFilter ? (
+                <Button variant="subtle" size="md" onClick={() => { updateQ(''); setActiveFilter(''); }}>
+                  Clear filters
+                </Button>
+              ) : (
+                <Button variant="primary" size="md" onClick={() => router.push('/admin/services/new')}>
+                  + Create service
+                </Button>
+              )
+            }
+          />
+        )}
+        {items !== null && items.length > 0 && (
           <>
-            <Table columns={cols} rows={items} keyField="_id" empty={t('noResults')} />
+            <Table columns={cols} rows={items} keyField="_id" />
             <Pagination page={page} total={meta.total || 0} pageSize={PAGE_SIZE} onChange={setPage} />
           </>
         )}

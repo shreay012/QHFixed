@@ -241,6 +241,7 @@ export default function AdminPaymentsPage() {
       <PageHeader
         title="Payments"
         subtitle="Every transaction across countries, currencies, and gateways"
+        helpText="Click a transaction ID to see customer, job, and full invoice breakdown. KPIs are grouped by currency so you never mix INR with EUR totals."
       />
 
       {/* KPIs — one stat card per active currency */}
@@ -267,7 +268,10 @@ export default function AdminPaymentsPage() {
       </div>
 
       {/* Filters */}
-      <SectionCard title="Filters">
+      <SectionCard
+        title="Filters"
+        description="Narrow by status, country, currency, gateway, or date range. Search matches payment / order IDs and partial Razorpay/Stripe IDs."
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <SearchInput
             value={filters.q}
@@ -292,13 +296,35 @@ export default function AdminPaymentsPage() {
             <Button variant="ghost" onClick={resetFilters}>Reset</Button>
           </div>
         </div>
+
+        {/* Applied filter chips — gives the user an at-a-glance view of
+            what's narrowing the result set, with one-click chip removal.
+            Hides itself when no filters are active. */}
+        {(filters.status || filters.country || filters.currency || filters.gateway || filters.from || filters.to || (filters.q && filters.q.trim())) && (
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-[#E5F1E2]">
+            <span className="text-[11px] uppercase tracking-wider text-[#909090] font-open-sauce-semibold">Applied:</span>
+            {filters.q && filters.q.trim() && (
+              <FilterChip label={`Search: "${filters.q.trim()}"`} onRemove={() => setFilter('q', '')} />
+            )}
+            {filters.status   && <FilterChip label={`Status: ${filters.status}`}     onRemove={() => setFilter('status', '')} />}
+            {filters.country  && <FilterChip label={`Country: ${filters.country}`}   onRemove={() => setFilter('country', '')} />}
+            {filters.currency && <FilterChip label={`Currency: ${filters.currency}`} onRemove={() => setFilter('currency', '')} />}
+            {filters.gateway  && <FilterChip label={`Gateway: ${filters.gateway}`}   onRemove={() => setFilter('gateway', '')} />}
+            {filters.from     && <FilterChip label={`From: ${filters.from}`}         onRemove={() => setFilter('from', '')} />}
+            {filters.to       && <FilterChip label={`To: ${filters.to}`}             onRemove={() => setFilter('to', '')} />}
+          </div>
+        )}
       </SectionCard>
 
       {/* Table */}
       {error && <ErrorBox error={error} />}
       {loading && <Spinner />}
       {!loading && rows.length === 0 && !error && (
-        <EmptyState message="No payments match these filters." />
+        <EmptyState
+          title="No payments match these filters"
+          description="Try clearing one or more filters, or expanding the date range."
+          action={<Button variant="subtle" size="md" onClick={resetFilters}>Reset filters</Button>}
+        />
       )}
       {!loading && rows.length > 0 && (
         <>
@@ -314,5 +340,28 @@ export default function AdminPaymentsPage() {
 
       <PaymentDetailModal key={openId || 'none'} paymentId={openId} onClose={() => setOpenId(null)} />
     </div>
+  );
+}
+
+/**
+ * FilterChip — removable chip used by the "Applied:" filter strip.
+ * Reusable enough to be hoisted into ui.jsx later if other pages
+ * adopt the same pattern.
+ */
+function FilterChip({ label, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F2F9F1] text-[#26472B] text-[11px] font-open-sauce-semibold ring-1 ring-[#D6EBCF]">
+      <span className="truncate max-w-[180px]">{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="-mr-0.5 ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-[#D6EBCF] transition-colors"
+        aria-label={`Remove ${label}`}
+      >
+        <svg width={9} height={9} viewBox="0 0 24 24" fill="none">
+          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+        </svg>
+      </button>
+    </span>
   );
 }

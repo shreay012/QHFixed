@@ -13,6 +13,7 @@ import {
   ErrorBox,
   Button,
   EmptyState,
+  Pagination,
 } from '@/components/staff/ui';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -161,12 +162,6 @@ export default function AdminBookingsPage() {
       setBusyAssign(false);
     }
   };
-
-  // ─── Quick stats ──────────────────────────────────────────────────────────
-  const loaded = Array.isArray(bookings) && bookings.length > 0;
-  const countPending   = bookings ? bookings.filter((b) => b.status === 'pending').length : 0;
-  const countActive    = bookings ? bookings.filter((b) => ['confirmed', 'assigned_to_pm', 'in_progress'].includes(b.status)).length : 0;
-  const countCompleted = bookings ? bookings.filter((b) => b.status === 'completed').length : 0;
 
   // ─── Table columns ────────────────────────────────────────────────────────
   const columns = [
@@ -322,8 +317,6 @@ export default function AdminBookingsPage() {
 
   // ─── Pagination helpers ───────────────────────────────────────────────────
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const fromRow = (page - 1) * PAGE_SIZE + 1;
-  const toRow   = Math.min(page * PAGE_SIZE, total);
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -332,6 +325,7 @@ export default function AdminBookingsPage() {
       <PageHeader
         title="Bookings"
         subtitle="All customer bookings across services"
+        helpText="Click any row to open the full booking detail. Use the filter pills to narrow by status."
       />
 
       {/* ── Status Filter Tabs ────────────────────────────────────────────── */}
@@ -353,6 +347,18 @@ export default function AdminBookingsPage() {
               </button>
             );
           })}
+          {activeStatus && (
+            <button
+              type="button"
+              onClick={() => handleStatusChange('')}
+              className="flex-shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs bg-[#F7FBF6] text-[#26472B] border border-[#D6EBCF] font-open-sauce-medium hover:bg-white"
+            >
+              Clear filters
+              <svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -360,27 +366,29 @@ export default function AdminBookingsPage() {
       <div className="p-4 sm:p-8 space-y-5">
         <ErrorBox error={error} />
 
-        {/* Quick stats row — shown once data is loaded */}
+        {/* Result summary line — accurate global counts via meta.total
+            instead of the misleading "current-page only" stats the
+            previous version showed. */}
         {bookings !== null && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: 'Showing',   value: bookings.length },
-              { label: 'Pending',   value: countPending,   accent: countPending > 0 ? 'text-amber-600' : '' },
-              { label: 'Active',    value: countActive,    accent: countActive > 0 ? 'text-[#26472B]' : '' },
-              { label: 'Completed', value: countCompleted },
-            ].map(({ label, value, accent }) => (
-              <div
-                key={label}
-                className="bg-white border border-[#E5F1E2] rounded-xl p-3 shadow-[0_1px_3px_rgba(38,71,43,0.04)]"
-              >
-                <div className="text-[11px] uppercase text-[#909090] tracking-wider font-open-sauce-semibold">
-                  {label}
-                </div>
-                <div className={`text-xl font-open-sauce-bold mt-1 ${accent || 'text-[#26472B]'}`}>
-                  {value}
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between gap-3 flex-wrap text-sm font-open-sauce text-[#636363]">
+            <div>
+              <span className="font-open-sauce-semibold text-[#26472B]">
+                {total.toLocaleString('en-IN')}
+              </span>{' '}
+              booking{total === 1 ? '' : 's'} match
+              {activeStatus && (
+                <>
+                  {' '}
+                  ·{' '}
+                  <span className="text-[#26472B] font-open-sauce-semibold capitalize">
+                    {activeStatus.replace(/_/g, ' ')}
+                  </span>
+                </>
+              )}
+            </div>
+            <div className="text-xs text-[#909090]">
+              Page {page} of {Math.max(1, totalPages)}
+            </div>
           </div>
         )}
 
@@ -389,44 +397,32 @@ export default function AdminBookingsPage() {
           <Table columns={columns} rows={[]} loading={true} />
         )}
 
-        {/* Table */}
-        {bookings !== null && (
-          <Table
-            columns={columns}
-            rows={bookings}
-            keyField="_id"
-            empty="No bookings found for this filter."
+        {/* Table or empty state */}
+        {bookings !== null && bookings.length === 0 && (
+          <EmptyState
+            title={activeStatus ? `No ${activeStatus.replace(/_/g, ' ')} bookings` : 'No bookings yet'}
+            description={
+              activeStatus
+                ? "Nothing matches the current filter. Try clearing it or picking a different status."
+                : 'Bookings appear here as customers place them.'
+            }
+            action={
+              activeStatus && (
+                <Button variant="subtle" size="md" onClick={() => handleStatusChange('')}>
+                  Clear filter
+                </Button>
+              )
+            }
           />
+        )}
+
+        {bookings !== null && bookings.length > 0 && (
+          <Table columns={columns} rows={bookings} keyField="_id" />
         )}
 
         {/* Pagination */}
         {bookings !== null && total > PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E5F1E2]">
-            <span className="text-sm text-[#636363] font-open-sauce">
-              Showing {fromRow}–{toRow} of {total}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="subtle"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                ← Prev
-              </Button>
-              <span className="px-3 py-1.5 text-sm text-[#26472B] font-open-sauce-semibold select-none">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                size="sm"
-                variant="subtle"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next →
-              </Button>
-            </div>
-          </div>
+          <Pagination page={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
         )}
       </div>
 
