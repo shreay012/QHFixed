@@ -57,16 +57,29 @@ const ChatPanel = ({
     scrollToBottom();
   }, [messages, isTyping]);
 
-  // Load chat messages
-  const loadMessages = useCallback(async () => {
+  // Fetch + parse chat messages. Two modes:
+  //   • initial = true  → first load on mount: shows the spinner, fully replaces
+  //                       state, surfaces network errors.
+  //   • initial = false → silent poll/refresh: merges any genuinely new
+  //                       messages into the existing array without touching
+  //                       `loading`, so the chat window doesn't flicker /
+  //                       reset its scroll position every poll tick.
+  // The socket's `onMessageReceived` is the primary path for new messages —
+  // this function exists only as a recovery mechanism when the socket is down
+  // or briefly drops a server event.
+  const loadMessages = useCallback(async (initial = true) => {
     if (!bookingId || !serviceId) {
-      setError("Missing booking or service information");
-      setLoading(false);
+      if (initial) {
+        setError("Missing booking or service information");
+        setLoading(false);
+      }
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    if (initial) {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
       const customerId = adminId && adminId.trim() ? adminId : serviceId;
@@ -87,15 +100,34 @@ const ChatPanel = ({
           (m, i, arr) => arr.findIndex((x) => x.id === m.id) === i,
         );
 
-        setMessages(uniqueMessages);
+        if (initial) {
+          setMessages(uniqueMessages);
+        } else {
+          // Merge: keep existing message identities (so React doesn't remount
+          // every bubble + the scroll container doesn't snap), only push the
+          // ones we don't already have.
+          setMessages((prev) => {
+            const seen = new Set();
+            for (const m of prev) {
+              if (m.id) seen.add(m.id);
+              if (m.messageId) seen.add(m.messageId);
+            }
+            const additions = uniqueMessages.filter(
+              (m) => !seen.has(m.id) && !seen.has(m.messageId),
+            );
+            if (additions.length === 0) return prev;
+            return [...prev, ...additions].sort((a, b) => a.timestamp - b.timestamp);
+          });
+        }
 
         if (uniqueMessages.length > 0) {
           lastMessageIdRef.current = uniqueMessages[uniqueMessages.length - 1].id;
         }
-      } else {
+      } else if (initial) {
         setMessages([]);
       }
     } catch (err) {
+      if (!initial) return; // silent on background polls
       // Don't block UI for 500/404 — backend may not be ready
       if (err.response?.status === 500 || err.response?.status === 404) {
         setError(null);
@@ -105,21 +137,23 @@ const ChatPanel = ({
         setMessages([]);
       }
     } finally {
-      setLoading(false);
+      if (initial) setLoading(false);
     }
   }, [bookingId, adminId, serviceId, currentUserId]);
 
-  // Polling fallback:
-  //  • When socket is DISCONNECTED → poll every 5 s (real-time fallback)
-  //  • When socket is CONNECTED    → poll every 30 s (catch any missed events)
+  // Polling is now ONLY a degraded-mode fallback. When the socket is
+  // connected (the normal case), `onMessageReceived` already appends new
+  // messages in real time — polling there is redundant and was causing the
+  // visible "chat window auto-refresh" flicker. So:
+  //   • socket connected    → no polling at all
+  //   • socket disconnected → quiet 10s delta-merge poll until reconnect
   useEffect(() => {
     if (!bookingId || !serviceId) return;
-
-    const interval = socketConnected ? 30_000 : 5_000;
+    if (socketConnected) return;
 
     pollingIntervalRef.current = setInterval(() => {
-      loadMessages();
-    }, interval);
+      loadMessages(false);
+    }, 10_000);
 
     return () => {
       if (pollingIntervalRef.current) {
@@ -161,7 +195,7 @@ const ChatPanel = ({
           return [...prev, newMessage].sort((a, b) => a.timestamp - b.timestamp);
         });
       },
-      onRefreshMessages: () => { loadMessages(); },
+      onRefreshMessages: () => { loadMessages(false); },
       onConnected: () => { setSocketConnected(true); },
       onDisconnected: () => { setSocketConnected(false); },
       onError: () => { setSocketConnected(false); },
