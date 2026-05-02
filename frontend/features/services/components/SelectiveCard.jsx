@@ -10,6 +10,7 @@ import { useCmsTranslate } from "@/lib/i18n/useCmsTranslate";
 
 const SelectiveCard = ({ serviceData, isLoading }) => {
   const tServiceDetails = useTranslations("serviceDetails");
+  const t = useTranslations("selectiveCard");
   const tCms = useCmsTranslate();
   // No longer fetching data here - receiving it as props
 
@@ -31,18 +32,13 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
           if (!item) return '';
           return typeof item === 'string' ? tCms(item) : tCms(item) || item?.name || item?.id || '';
         }).filter(Boolean)
-      : [
-          "Software licenses or paid third-party tools",
-          "Support beyond timelines",
-          "Work beyond the defined project scope",
-          "Weekends & national holiday support.",
-        ];
+      : [t("default1"), t("default2"), t("default3"), t("default4")];
 
   const promises = [
-    "Verified professionals assigned to your task",
-    "Support Extension Option",
-    "Transparent, upfront pricing",
-    "Delivery as Scheduled",
+    t("promise1"),
+    t("promise2"),
+    t("promise3"),
+    t("promise4"),
   ];
 
   if (isLoading) {
@@ -68,7 +64,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
               marginBottom: "8px",
             }}
           >
-            Select the Right fit for you
+            {t("subhead")}
           </Typography>
           <Typography
             variant="h2"
@@ -79,7 +75,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
               color: "var(--text-primary)",
             }}
           >
-            Curated Engineers For You
+            {t("heading")}
           </Typography>
         </div>
 
@@ -125,7 +121,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
         ) : (
           <div className="text-center mb-16">
             <Typography sx={{ color: "var(--text-secondary)" }}>
-              No technologies available for this service
+              {t("noTechnologies")}
             </Typography>
           </div>
         )}
@@ -145,7 +141,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
               mb: 2,
             }}
           >
-            Transparent Execution
+            {t("transparentTitle")}
           </Typography>
           <Typography
             sx={{
@@ -155,7 +151,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
               mb: 4,
             }}
           >
-            Transparency built into every stage of execution.
+            {t("transparentSubtitle")}
           </Typography>
 
           {/* Working Hours Badge */}
@@ -179,7 +175,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
                 color: "#1F2937",
               }}
             >
-              Monday–Friday • 9 AM – 6 PM IST
+              {t("workingHours")}
             </Typography>
           </Box>
         </div>
@@ -205,7 +201,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
                 borderLeft: "4px solid #45A735",
               }}
             >
-              What You Get
+              {t("whatYouGet")}
             </Typography>
             <div className="space-y-3">
               {promises.map((promise, index) => (
@@ -252,7 +248,7 @@ const SelectiveCard = ({ serviceData, isLoading }) => {
                 borderLeft: "4px solid #EF4444",
               }}
             >
-              What's not Included
+              {t("whatsNotIncluded")}
             </Typography>
             <div className="space-y-3">
               {notIncluded.map((item, index) => (

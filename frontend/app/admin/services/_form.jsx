@@ -149,114 +149,174 @@ function SectionCard({ title, hint, children }) {
   );
 }
 
-// ─── StringListEditor ─────────────────────────────────────────────────────────
+// ─── LocalizedListEditor ──────────────────────────────────────────────────────
+// Editor for a list where each entry is an i18n object {en, de, hi, …}.
+// Each entry is shown as a row with the English label and a "Translations ▼"
+// disclosure that reveals every other locale below it.
 
-function StringListEditor({ items, onChange, placeholder }) {
-  const [input, setInput] = useState('');
-
-  const add = () => {
-    const val = input.trim();
-    if (!val) return;
-    onChange([...items, val]);
-    setInput('');
-  };
+function LocalizedItem({ item, index, onChange, onRemove, placeholder }) {
+  const [open, setOpen] = useState(!item.en);
 
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2">
-        <Input
-          value={input}
-          onChange={setInput}
-          placeholder={placeholder}
-        />
-        <button
-          type="button"
-          onClick={add}
-          onKeyDown={(e) => e.key === 'Enter' && add()}
-          className="px-4 py-2.5 bg-[#45A735] text-white text-sm font-semibold rounded-xl hover:bg-[#3d9230] flex-shrink-0"
-        >
-          Add
-        </button>
+    <div className="border border-[#E5F1E2] rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 bg-[#F7FBF6]">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-6 h-6 rounded-full bg-[#45A735] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+            {index + 1}
+          </span>
+          <span className="text-sm font-open-sauce-semibold text-[#26472B] truncate">
+            {item.en || <span className="text-[#909090] italic font-normal">Enter English text…</span>}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs font-semibold text-[#45A735] hover:underline">
+            {open ? 'Collapse ▲' : 'Translations ▼'}
+          </button>
+          <button type="button" onClick={onRemove} className="text-xs text-red-400 hover:text-red-600">
+            Remove
+          </button>
+        </div>
       </div>
-      {items.length > 0 && (
-        <ul className="space-y-2">
-          {items.map((item, i) => (
-            <li key={i} className="flex items-center justify-between bg-[#F7FBF6] border border-[#E5F1E2] rounded-xl px-4 py-2.5 text-sm">
-              <span className="text-[#26472B]">{item}</span>
-              <button
-                type="button"
-                onClick={() => onChange(items.filter((_, idx) => idx !== i))}
-                className="text-red-400 hover:text-red-600 text-xs ml-3 flex-shrink-0"
-              >
-                Remove
-              </button>
-            </li>
+      {open && (
+        <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {LANGUAGES.map(({ code, label }) => (
+            <div key={code}>
+              <label className="block text-[10px] font-bold text-[#636363] uppercase tracking-wider mb-1.5">
+                {label}
+                {code === 'en' && <span className="text-red-400 ml-1">*</span>}
+              </label>
+              <input
+                value={item[code] || ''}
+                onChange={(e) => onChange({ ...item, [code]: e.target.value })}
+                placeholder={code === 'en' ? placeholder : `In ${label}…`}
+                className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:border-[#45A735] focus:ring-1 focus:ring-[#45A73520] transition-colors ${
+                  code === 'en' && !item.en ? 'border-red-200 bg-red-50/30' : 'border-[#E5F1E2]'
+                }`}
+              />
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
 }
 
+function LocalizedListEditor({ items, onChange, placeholder, addLabel = '+ Add Item' }) {
+  return (
+    <div className="space-y-3">
+      {items.length === 0 && (
+        <div className="text-center py-10 border-2 border-dashed border-[#C8E5C2] rounded-2xl text-sm text-[#909090]">
+          Nothing added yet.
+        </div>
+      )}
+      {items.map((item, i) => (
+        <LocalizedItem
+          key={i}
+          index={i}
+          item={item}
+          placeholder={placeholder}
+          onChange={(val) => onChange(items.map((t, idx) => (idx === i ? val : t)))}
+          onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...items, emptyLangMap()])}
+        className="w-full py-3 border-2 border-dashed border-[#45A735] text-[#45A735] text-sm font-bold rounded-2xl hover:bg-[#F7FBF6] transition-colors"
+      >
+        {addLabel}
+      </button>
+    </div>
+  );
+}
+
 // ─── FaqEditor ────────────────────────────────────────────────────────────────
+// Each FAQ stores question and answer as i18n maps (emptyLangMap), so admins
+// can localise both per language. English is required for each FAQ.
 
-function FaqEditor({ faqs, onChange }) {
-  const [q, setQ] = useState('');
-  const [a, setA] = useState('');
-
-  const add = () => {
-    if (!q.trim() || !a.trim()) return;
-    onChange([...faqs, { question: q.trim(), answer: a.trim() }]);
-    setQ(''); setA('');
-  };
-
-  const update = (i, field, val) =>
-    onChange(faqs.map((f, idx) => (idx === i ? { ...f, [field]: val } : f)));
+function FaqItem({ faq, index, onChange, onRemove }) {
+  const [open, setOpen] = useState(!faq.question?.en);
+  const updateField = (field, code, val) =>
+    onChange({ ...faq, [field]: { ...faq[field], [code]: val } });
 
   return (
-    <div className="space-y-4">
-      {faqs.map((faq, i) => (
-        <div key={i} className="border border-[#E5F1E2] rounded-2xl p-5 space-y-3 bg-[#F7FBF6]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#45A735] uppercase tracking-widest">FAQ #{i + 1}</span>
-            <button
-              type="button"
-              onClick={() => onChange(faqs.filter((_, idx) => idx !== i))}
-              className="text-xs text-red-400 hover:text-red-600"
-            >
-              Remove
-            </button>
-          </div>
-          <div>
-            <Label>Question</Label>
-            <Input value={faq.question} onChange={(v) => update(i, 'question', v)} placeholder="e.g. How quickly can I start?" />
-          </div>
-          <div>
-            <Label>Answer</Label>
-            <Textarea value={faq.answer} onChange={(v) => update(i, 'answer', v)} placeholder="Write a clear, helpful answer…" rows={3} />
-          </div>
+    <div className="border border-[#E5F1E2] rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 bg-[#F7FBF6]">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-6 h-6 rounded-full bg-[#45A735] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+            {index + 1}
+          </span>
+          <span className="text-sm font-open-sauce-semibold text-[#26472B] truncate">
+            {faq.question?.en || <span className="text-[#909090] italic font-normal">Enter English question…</span>}
+          </span>
         </div>
-      ))}
-
-      <div className="border-2 border-dashed border-[#C8E5C2] rounded-2xl p-5 space-y-3">
-        <p className="text-xs font-bold text-[#45A735] uppercase tracking-widest">Add New FAQ</p>
-        <div>
-          <Label>Question</Label>
-          <Input value={q} onChange={setQ} placeholder="e.g. What happens if I need more hours?" />
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs font-semibold text-[#45A735] hover:underline">
+            {open ? 'Collapse ▲' : 'Translations ▼'}
+          </button>
+          <button type="button" onClick={onRemove} className="text-xs text-red-400 hover:text-red-600">
+            Remove
+          </button>
         </div>
-        <div>
-          <Label>Answer</Label>
-          <Textarea value={a} onChange={setA} placeholder="Write a helpful answer…" rows={3} />
-        </div>
-        <button
-          type="button"
-          onClick={add}
-          disabled={!q.trim() || !a.trim()}
-          className="px-5 py-2 bg-[#45A735] text-white text-sm font-semibold rounded-xl hover:bg-[#3d9230] disabled:opacity-40 transition-colors"
-        >
-          + Add FAQ
-        </button>
       </div>
+      {open && (
+        <div className="px-5 py-5 space-y-5">
+          {LANGUAGES.map(({ code, label }) => (
+            <div key={code} className="border-l-2 border-[#E5F1E2] pl-4 space-y-2">
+              <p className="text-[10px] font-bold text-[#636363] uppercase tracking-wider">
+                {label}
+                {code === 'en' && <span className="text-red-400 ml-1">*</span>}
+              </p>
+              <div>
+                <Label>Question ({code})</Label>
+                <Input
+                  value={faq.question?.[code] || ''}
+                  onChange={(v) => updateField('question', code, v)}
+                  placeholder={code === 'en' ? 'e.g. How quickly can I start?' : `Question in ${label}…`}
+                  className={code === 'en' && !faq.question?.en ? 'border-red-200' : ''}
+                />
+              </div>
+              <div>
+                <Label>Answer ({code})</Label>
+                <Textarea
+                  value={faq.answer?.[code] || ''}
+                  onChange={(v) => updateField('answer', code, v)}
+                  placeholder={code === 'en' ? 'Write a clear, helpful answer…' : `Answer in ${label}…`}
+                  rows={3}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FaqEditor({ faqs, onChange }) {
+  return (
+    <div className="space-y-3">
+      {faqs.length === 0 && (
+        <div className="text-center py-10 border-2 border-dashed border-[#C8E5C2] rounded-2xl text-sm text-[#909090]">
+          No FAQs added yet — the platform's default localized FAQs will be shown.
+        </div>
+      )}
+      {faqs.map((faq, i) => (
+        <FaqItem
+          key={i}
+          index={i}
+          faq={faq}
+          onChange={(val) => onChange(faqs.map((f, idx) => (idx === i ? val : f)))}
+          onRemove={() => onChange(faqs.filter((_, idx) => idx !== i))}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...faqs, { question: emptyLangMap(), answer: emptyLangMap() }])}
+        className="w-full py-3 border-2 border-dashed border-[#45A735] text-[#45A735] text-sm font-bold rounded-2xl hover:bg-[#F7FBF6] transition-colors"
+      >
+        + Add FAQ
+      </button>
     </div>
   );
 }
@@ -576,13 +636,31 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
       return null;
     }).filter((t) => t?.en);
 
+    // notIncluded — entries can be plain strings (legacy), {name:string}
+    // (older shape), or full i18n objects ({en, de, …}). Normalise to a
+    // language map so admins can edit each locale.
     const notInc = (initialData.notIncluded || [])
-      .map((t) => (typeof t === 'string' ? t : t?.name || ''))
-      .filter(Boolean);
+      .map((t) => {
+        if (typeof t === 'string') return { ...emptyLangMap(), en: t };
+        if (typeof t === 'object' && t !== null) {
+          const base = { ...emptyLangMap() };
+          for (const code of LANG_CODES) { if (t[code]) base[code] = t[code]; }
+          if (!base.en && t.name) base.en = t.name;
+          return base;
+        }
+        return null;
+      })
+      .filter((t) => t?.en);
 
+    // FAQs — questions/answers can be strings (legacy) or i18n objects.
+    // Normalise both to a language map so admins can edit each locale.
     const faqs = (initialData.faqs || []).map((f) => ({
-      question: typeof f.question === 'object' ? (f.question.en || '') : (f.question || ''),
-      answer:   typeof f.answer   === 'object' ? (f.answer.en   || '') : (f.answer   || ''),
+      question: (typeof f.question === 'object' && f.question !== null)
+        ? { ...emptyLangMap(), ...f.question }
+        : { ...emptyLangMap(), en: typeof f.question === 'string' ? f.question : '' },
+      answer: (typeof f.answer === 'object' && f.answer !== null)
+        ? { ...emptyLangMap(), ...f.answer }
+        : { ...emptyLangMap(), en: typeof f.answer === 'string' ? f.answer : '' },
     }));
 
     setForm({
@@ -632,6 +710,28 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
           return obj;
         });
 
+      // notIncluded — drop empty entries and ship each as a sparse i18n
+      // object (only locales that have a value). Backend stores the same
+      // shape so flattenI18nDeep can localise to the active locale at read.
+      const notIncludedI18n = form.notIncluded
+        .filter((t) => t?.en?.trim())
+        .map((t) => Object.fromEntries(
+          LANG_CODES.map((c) => [c, t[c]?.trim() || '']).filter(([, v]) => v),
+        ));
+
+      // FAQs — keep both question and answer as multi-locale maps. English
+      // is required; other locales are optional and fall back via flattenI18nDeep.
+      const faqsI18n = form.faqs
+        .filter((f) => f.question?.en?.trim() && f.answer?.en?.trim())
+        .map((f) => ({
+          question: Object.fromEntries(
+            LANG_CODES.map((c) => [c, f.question[c]?.trim() || '']).filter(([, v]) => v),
+          ),
+          answer: Object.fromEntries(
+            LANG_CODES.map((c) => [c, f.answer[c]?.trim() || '']).filter(([, v]) => v),
+          ),
+        }));
+
       const body = {
         name:         nameI18n,
         category:     form.category || '',
@@ -641,8 +741,8 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
         // string branch required min(1); both ends now accept empty too).
         tagline:      taglineI18n,
         technologies: techObjects,
-        notIncluded:  form.notIncluded.filter(Boolean),
-        faqs:         form.faqs,
+        notIncluded:  notIncludedI18n,
+        faqs:         faqsI18n,
         hourlyRate:   Number(form.hourlyRate) || 0,
         imageUrl:     form.imageUrl || '',
         active:       form.active,
@@ -878,12 +978,13 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
 
             <SectionCard
               title="What's Not Included"
-              hint={`These appear in the red "What's Not Included" box on the service page. Add one item per line.`}
+              hint={`These appear in the red "What's Not Included" box on the service page. Each entry can be translated into every supported language — English is required.`}
             >
-              <StringListEditor
+              <LocalizedListEditor
                 items={form.notIncluded}
                 onChange={(val) => setForm({ ...form, notIncluded: val })}
                 placeholder="e.g. Software licenses or paid third-party tools"
+                addLabel="+ Add Item"
               />
             </SectionCard>
           </>

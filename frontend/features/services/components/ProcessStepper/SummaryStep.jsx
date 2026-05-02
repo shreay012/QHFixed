@@ -21,7 +21,8 @@ import { paymentService } from "@/lib/services/paymentApi";
 import { bookingService } from "@/lib/services/bookingApi";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { useCmsTranslate } from "@/lib/i18n/useCmsTranslate";
 import { fetchDashboardStats } from "@/lib/redux/slices/dashboardSlice";
 import { addToCart } from "@/lib/redux/slices/cartSlice/cartSlice";
 
@@ -30,6 +31,12 @@ const SummaryStep = () => {
   const t = useTranslations("summaryStep");
   const tPay = useTranslations("paymentStep");
   const { format: fmtMoney } = usePrice();
+  // Active next-intl locale → use as BCP-47 for Date.toLocaleDateString
+  // so the start-date reads as "8 Mai 2026" in DE, "May 8, 2026" in EN, etc.
+  const locale = useLocale();
+  const localeBcp = locale || "en-US";
+  // Service names are i18n objects ({en, de, …}); tCms picks the active locale.
+  const tCms = useCmsTranslate();
   const {
     gstNumber,
     setGstNumber,
@@ -142,16 +149,16 @@ const SummaryStep = () => {
 
         const bookingTypeDisplay =
           service.serviceId?.bookingType === "instant"
-            ? "Book Instantly"
-            : "Schedule for Later";
+            ? tPay('bookInstantly')
+            : tPay('scheduleLater');
 
         let startDateDisplay = "N/A";
         if (service.preferredStartDate) {
           if (service.serviceId?.bookingType === "instant") {
-            startDateDisplay = "Immediately";
+            startDateDisplay = tPay('immediately');
           } else {
             const startDate = new Date(service.preferredStartDate);
-            startDateDisplay = startDate.toLocaleDateString("en-US", {
+            startDateDisplay = startDate.toLocaleDateString(localeBcp, {
               day: "numeric",
               month: "short",
               year: "numeric",
@@ -160,7 +167,7 @@ const SummaryStep = () => {
         }
 
         return {
-          serviceName: service.serviceId?.name || "Unknown Service",
+          serviceName: tCms(service.serviceId?.nameI18n || service.serviceId?.name) || "—",
           technicalSkills: techNames,
           hours: service.durationTime || 0,
           bookingType: bookingTypeDisplay,
@@ -215,18 +222,18 @@ const SummaryStep = () => {
         // Format booking type
         const bookingTypeDisplay =
           serviceData.bookingType === "instant"
-            ? "Book Instantly"
-            : "Schedule for Later";
+            ? tPay('bookInstantly')
+            : tPay('scheduleLater');
 
         // Format start date display based on booking type
         let startDateDisplay;
         if (serviceData.bookingType === "instant") {
           // For instant booking, show "Immediately" or current time
-          startDateDisplay = "Immediately";
+          startDateDisplay = tPay('immediately');
         } else {
           // For scheduled booking, show formatted date
           const startDate = new Date(serviceData.preferredStartDate);
-          startDateDisplay = startDate.toLocaleDateString("en-US", {
+          startDateDisplay = startDate.toLocaleDateString(localeBcp, {
             day: "numeric",
             month: "short",
             year: "numeric",
@@ -236,7 +243,7 @@ const SummaryStep = () => {
         const formattedBookingData = {
           services: [
             {
-              serviceName: serviceData.serviceId?.name || "",
+              serviceName: tCms(serviceData.serviceId?.nameI18n || serviceData.serviceId?.name) || "",
               technicalSkills: techNames,
               hours: serviceData.durationTime || 0,
               bookingType: bookingTypeDisplay,
@@ -598,7 +605,7 @@ const SummaryStep = () => {
                 color: "#45A735",
               }}
             >
-              🔄 Loading job details...
+              {`🔄 ${tPay('loadingJob')}`}
             </Typography>
           </Box>
         )}
@@ -614,7 +621,7 @@ const SummaryStep = () => {
             lineHeight: 1.3,
           }}
         >
-          Review Your Booking
+          {tPay('reviewBooking')}
         </Typography>
 
         {/* Subheading */}
@@ -627,8 +634,7 @@ const SummaryStep = () => {
             lineHeight: 1.5,
           }}
         >
-          Once payment is completed, we'll match you with a suitable expert and
-          get started.
+          {tPay('reviewBookingSubtitle')}
         </Typography>
 
         {/* Booking Summary Card */}
@@ -802,8 +808,10 @@ const SummaryStep = () => {
                       lineHeight: 1.4,
                     }}
                   >
-                    {service.hours || 0} hours / ₹
-                    {service.basePrice.toLocaleString("en-IN")}
+                    {tPay('hoursAndPrice', {
+                      hours: service.hours || 0,
+                      price: fmtMoney(service.basePrice, { maxDigits: 2 }),
+                    })}
                   </Typography>
                 </Box>
 
@@ -861,8 +869,8 @@ const SummaryStep = () => {
                     }}
                   >
                     {service.isInstant
-                      ? `Starting: ${service.startDate}`
-                      : `Starting from ${service.startDate}`}
+                      ? tPay('starting', { date: service.startDate })
+                      : tPay('startingFrom', { date: service.startDate })}
                   </Typography>
                 </Box>
               </Box>
@@ -886,7 +894,7 @@ const SummaryStep = () => {
                 textAlign: "center",
               }}
             >
-              Loading booking details...
+              {tPay('loadingBooking')}
             </Typography>
           </Box>
         )}
@@ -921,7 +929,7 @@ const SummaryStep = () => {
                 color: "#45A735",
               }}
             >
-              {bookingData.totalHours} hours
+              {tPay('hoursLabel', { hours: bookingData.totalHours })}
             </Typography>
           </Box>
         )}
@@ -1003,7 +1011,7 @@ const SummaryStep = () => {
                   color: "#45A735",
                 }}
               >
-                Discount
+                {tPay('discount')}
               </Typography>
               <Typography
                 sx={{

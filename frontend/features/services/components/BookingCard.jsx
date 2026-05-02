@@ -2,42 +2,21 @@
 
 import React from "react";
 import { Box, Typography, Card } from "@mui/material";
+import { useTranslations } from "next-intl";
 
 const BookingCard = ({ serviceData, isLoading }) => {
+  const t = useTranslations("bookingCard");
   // Receiving props for consistency, even if not using API data currently
 
   const firstRowSteps = [
-    {
-      number: 1,
-      title: "Booking",
-      description: "Choose your resource and place a booking in minutes.",
-    },
-    {
-      number: 2,
-      title: "Kick-off Call",
-      description:
-        "Connect with professional and with your project manager to align on goals and execution.",
-    },
+    { number: 1, title: t("step1Title"), description: t("step1Desc") },
+    { number: 2, title: t("step2Title"), description: t("step2Desc") },
   ];
 
   const secondRowSteps = [
-    {
-      number: 3,
-      title: "Work Starts",
-      description: "The expert begins work based on agreed plan.",
-    },
-    {
-      number: 4,
-      title: "Get Updates",
-      description:
-        "Receive regular progress updates via chat or email from your project manager.",
-    },
-    {
-      number: 5,
-      title: "Extend or Close",
-      description:
-        "Add more hours, continue with the same expert, or close project when done.",
-    },
+    { number: 3, title: t("step3Title"), description: t("step3Desc") },
+    { number: 4, title: t("step4Title"), description: t("step4Desc") },
+    { number: 5, title: t("step5Title"), description: t("step5Desc") },
   ];
 
   return (
@@ -62,7 +41,7 @@ const BookingCard = ({ serviceData, isLoading }) => {
               color: "var(--dark--text-secondary)",
             }}
           >
-            See How{" "}
+            {t("headingPrefix")}{" "}
             <span
               style={{
                 color: "var(--quickhire-green)",
@@ -70,9 +49,9 @@ const BookingCard = ({ serviceData, isLoading }) => {
                 fontStyle: "italic",
               }}
             >
-              QuickHire
+              {t("brand")}
             </span>{" "}
-            Can help you
+            {t("headingSuffix")}
           </Typography>
         </div>
 

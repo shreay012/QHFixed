@@ -9,9 +9,13 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useTranslations } from "next-intl";
+import { useCmsTranslate } from "@/lib/i18n/useCmsTranslate";
 
 const ServiceFaq = ({ serviceData, isLoading }) => {
   const t = useTranslations("serviceFaq");
+  // Admin can save FAQs as either plain strings (legacy) or i18n objects
+  // ({en, de, …}). tCms picks the active locale for both shapes.
+  const tCms = useCmsTranslate();
   const [expanded, setExpanded] = useState(false);
 
   const handleChange = (panel) => (event, isExpanded) => {
@@ -30,8 +34,8 @@ const ServiceFaq = ({ serviceData, isLoading }) => {
     serviceData?.faqs?.length > 0
       ? serviceData.faqs.map((faq, index) => ({
           id: `panel${index + 1}`,
-          question: faq.question,
-          answer: faq.answer,
+          question: tCms(faq.questionI18n || faq.question) || "",
+          answer: tCms(faq.answerI18n || faq.answer) || "",
         }))
       : staticFaqs;
 

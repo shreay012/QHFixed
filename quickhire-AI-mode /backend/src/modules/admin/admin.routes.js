@@ -339,12 +339,17 @@ const serviceSchema = z.object({
   // (homepage Bookresourceservices grid) and as a sub-heading. Multi-locale.
   tagline:      I18nStringSchema.optional().default(''),
   technologies: z.array(TechItemSchema).optional().default([]),
-  notIncluded:  z.array(z.string().max(500)).optional().default([]),
+  // Admins can now write notIncluded entries per-language (same i18n shape as
+  // service name/description). Plain strings remain accepted for backwards
+  // compatibility with any older payloads or external imports.
+  notIncluded:  z.array(I18nStringSchema).optional().default([]),
   hourlyRate:   z.union([z.number(), z.string()]).transform((v) => Number(v) || 0),
   imageUrl:     z.string().url().optional().or(z.literal('')).default(''),
+  // FAQ question/answer can each be a plain string (legacy) or an i18n
+  // object so admins can localise FAQs alongside name/description.
   faqs:         z.array(z.object({
-    question: z.string().max(500),
-    answer:   z.string().max(2000),
+    question: I18nStringSchema,
+    answer:   I18nStringSchema,
   })).optional().default([]),
   active:       z.boolean().optional(),
   availability: z.record(z.unknown()).optional(),
