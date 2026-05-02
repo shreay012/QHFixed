@@ -8,35 +8,151 @@
 import React from 'react';
 
 // ─── 1. PageHeader ────────────────────────────────────────────────────────────
-export function PageHeader({ title, subtitle, action, backHref }) {
+//
+// Standard page header used at the top of every admin/PM/resource screen.
+// Optional breadcrumbs, help tooltip, and secondary actions panel make this
+// the single anchor point for "where am I + what can I do here".
+//
+// Props:
+//   title          — h1 string (required)
+//   subtitle       — short descriptor under the title
+//   breadcrumbs    — array of { label, href } rendered above the title
+//   action         — primary CTA (pass <Button>)
+//   secondaryActions — array of <Button> rendered next to the primary
+//   helpText       — string shown in a "?" tooltip next to the title
+//   backHref       — show a back arrow that navigates here
+export function PageHeader({
+  title,
+  subtitle,
+  action,
+  secondaryActions,
+  breadcrumbs,
+  helpText,
+  backHref,
+}) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-[#E5F1E2] bg-white px-4 sm:px-8 py-5">
-      <div className="flex items-start gap-3">
-        {backHref && (
-          <a
-            href={backHref}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[#636363] hover:bg-[#F2F9F1] hover:text-[#26472B] transition-all duration-200 flex-shrink-0 mt-0.5"
-            aria-label="Go back"
-          >
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-              <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </a>
-        )}
-        <div>
-          <h1 className="text-2xl sm:text-[28px] font-open-sauce-bold text-[#26472B] leading-tight">{title}</h1>
-          {subtitle && (
-            <p className="text-sm text-[#636363] mt-1 font-open-sauce">{subtitle}</p>
+    <div className="border-b border-[#E5F1E2] bg-white px-4 sm:px-8 py-5">
+      {Array.isArray(breadcrumbs) && breadcrumbs.length > 0 && (
+        <Breadcrumbs items={breadcrumbs} className="mb-2" />
+      )}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          {backHref && (
+            <a
+              href={backHref}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[#636363] hover:bg-[#F2F9F1] hover:text-[#26472B] transition-all duration-200 flex-shrink-0 mt-0.5"
+              aria-label="Go back"
+            >
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </a>
           )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-[28px] font-open-sauce-bold text-[#26472B] leading-tight truncate">
+                {title}
+              </h1>
+              {helpText && <HelpTip text={helpText} />}
+            </div>
+            {subtitle && (
+              <p className="text-sm text-[#636363] mt-1 font-open-sauce">{subtitle}</p>
+            )}
+          </div>
         </div>
+        {(action || secondaryActions) && (
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+            {Array.isArray(secondaryActions) && secondaryActions}
+            {action}
+          </div>
+        )}
       </div>
-      {action && <div className="flex-shrink-0">{action}</div>}
     </div>
   );
 }
 
+// ─── 1b. Breadcrumbs ──────────────────────────────────────────────────────────
+//
+// Compact, typography-driven breadcrumb trail. Renders nothing if items is
+// empty so it's safe to drop on every page header.
+export function Breadcrumbs({ items = [], className = '' }) {
+  if (!items.length) return null;
+  return (
+    <nav aria-label="Breadcrumb" className={`text-xs font-open-sauce text-[#909090] ${className}`}>
+      <ol className="flex items-center gap-1.5 flex-wrap">
+        {items.map((item, idx) => {
+          const isLast = idx === items.length - 1;
+          return (
+            <li key={`${item.label}-${idx}`} className="flex items-center gap-1.5">
+              {item.href && !isLast ? (
+                <a
+                  href={item.href}
+                  className="hover:text-[#26472B] transition-colors"
+                >
+                  {item.label}
+                </a>
+              ) : (
+                <span className={isLast ? 'text-[#26472B] font-open-sauce-semibold' : ''}>
+                  {item.label}
+                </span>
+              )}
+              {!isLast && (
+                <svg width={10} height={10} viewBox="0 0 24 24" fill="none" className="text-[#D6EBCF]">
+                  <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+// ─── 1c. HelpTip ──────────────────────────────────────────────────────────────
+//
+// Inline "?" icon that reveals a short tooltip on hover/focus. Use anywhere
+// you'd otherwise have to ship a docs link — works great next to form labels
+// and table column headers to onboard non-technical admins inline.
+export function HelpTip({ text, className = '' }) {
+  if (!text) return null;
+  return (
+    <span className={`group relative inline-flex items-center ${className}`}>
+      <span
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#F2F9F1] text-[#45A735] text-[10px] font-open-sauce-bold cursor-help ring-1 ring-[#D6EBCF] hover:bg-[#45A735] hover:text-white transition-colors"
+        aria-label="Help"
+        tabIndex={0}
+      >
+        ?
+      </span>
+      <span
+        role="tooltip"
+        className="invisible group-hover:visible group-focus-within:visible absolute left-1/2 -translate-x-1/2 top-full mt-2 z-30 w-56 px-3 py-2 rounded-lg bg-[#26472B] text-white text-[11px] leading-snug font-open-sauce shadow-lg pointer-events-none"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 // ─── 2. StatCard ──────────────────────────────────────────────────────────────
-export function StatCard({ label, value, hint, color = 'green', trend, icon }) {
+//
+// KPI tile with optional trend pill (↑ +12% vs. last week). Supports an
+// onClick handler so dashboard tiles can deep-link into the underlying
+// list view filtered to the same metric — drives the "click revenue → see
+// every paid booking" pattern that lets non-technical admins explore data
+// without typing filter URLs.
+export function StatCard({
+  label,
+  value,
+  hint,
+  color = 'green',
+  trend,
+  trendLabel,
+  icon,
+  onClick,
+  href,
+}) {
   const variants = {
     slate:  'from-white to-[#F5F7F5] text-[#484848] ring-[#E5E7EB]',
     green:  'from-[#F2F9F1] to-white text-[#26472B] ring-[#D6EBCF]',
@@ -46,6 +162,7 @@ export function StatCard({ label, value, hint, color = 'green', trend, icon }) {
     red:    'from-[#FEF2F2] to-white text-[#7F1D1D] ring-[#FCA5A5]',
     blue:   'from-[#EFF6FF] to-white text-[#1E40AF] ring-blue-200',
     purple: 'from-[#F5F3FF] to-white text-[#5B21B6] ring-purple-200',
+    amber:  'from-[#FFFBEB] to-white text-[#92400E] ring-amber-200',
   };
   const accentDot = {
     slate:  'bg-[#909090]',
@@ -56,17 +173,26 @@ export function StatCard({ label, value, hint, color = 'green', trend, icon }) {
     red:    'bg-[#EF4444]',
     blue:   'bg-[#3B82F6]',
     purple: 'bg-[#8B5CF6]',
+    amber:  'bg-[#F59E0B]',
   };
 
   const v = variants[color] || variants.green;
   const dot = accentDot[color] || accentDot.green;
 
-  const trendPositive = typeof trend === 'string' && trend.startsWith('+');
-  const trendNegative = typeof trend === 'string' && trend.startsWith('-');
+  const interactive = !!(onClick || href);
+  const Wrapper = href ? 'a' : 'div';
+  const wrapperProps = href
+    ? { href }
+    : interactive ? { onClick, role: 'button', tabIndex: 0 } : {};
 
   return (
-    <div
-      className={`relative rounded-2xl bg-gradient-to-br ${v} p-5 ring-1 shadow-[0_2px_8px_rgba(38,71,43,0.04)] hover:shadow-[0_8px_20px_rgba(69,167,53,0.10)] transition-shadow duration-200`}
+    <Wrapper
+      {...wrapperProps}
+      className={`relative rounded-2xl bg-gradient-to-br ${v} p-5 ring-1 shadow-[0_2px_8px_rgba(38,71,43,0.04)] transition-all duration-200 ${
+        interactive
+          ? 'cursor-pointer hover:shadow-[0_8px_24px_rgba(69,167,53,0.18)] hover:-translate-y-0.5'
+          : 'hover:shadow-[0_8px_20px_rgba(69,167,53,0.10)]'
+      } block`}
     >
       <div className="flex items-start justify-between">
         <div className="text-[11px] uppercase tracking-wider text-[#636363] font-open-sauce-semibold">
@@ -80,24 +206,49 @@ export function StatCard({ label, value, hint, color = 'green', trend, icon }) {
           <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${dot}`} />
         )}
       </div>
-      <div className="mt-3 text-3xl font-open-sauce-bold text-[#26472B] leading-tight">
+      <div className="mt-3 text-3xl font-open-sauce-bold text-[#26472B] leading-tight tabular-nums">
         {value}
       </div>
-      <div className="mt-1 flex items-center gap-2">
-        {hint && (
-          <span className="text-xs text-[#636363] font-open-sauce">{hint}</span>
-        )}
-        {trend && (
-          <span
-            className={`text-xs font-open-sauce-semibold ${
-              trendPositive ? 'text-[#45A735]' : trendNegative ? 'text-[#EF4444]' : 'text-[#636363]'
-            }`}
-          >
-            {trend}
-          </span>
-        )}
+      <div className="mt-2 flex items-center gap-2 flex-wrap">
+        {trend !== undefined && trend !== null && trend !== '' && <MetricDelta value={trend} label={trendLabel} />}
+        {hint && <span className="text-xs text-[#636363] font-open-sauce">{hint}</span>}
       </div>
-    </div>
+    </Wrapper>
+  );
+}
+
+// ─── 2b. MetricDelta ──────────────────────────────────────────────────────────
+//
+// Coloured delta pill for a KPI card. Accepts:
+//   - a number (e.g. 12 → "+12%")
+//   - a pre-formatted string (e.g. "+₹4.2k", "−2", "+12% MoM")
+// Auto-detects sign for colour. Pass `label` for "vs last week" footnote.
+export function MetricDelta({ value, label }) {
+  if (value === undefined || value === null || value === '') return null;
+  let display = String(value);
+  let positive = false;
+  let negative = false;
+  if (typeof value === 'number') {
+    positive = value > 0;
+    negative = value < 0;
+    display = `${value > 0 ? '+' : ''}${value}%`;
+  } else {
+    const trimmed = display.trim();
+    positive = trimmed.startsWith('+');
+    negative = trimmed.startsWith('-') || trimmed.startsWith('−');
+  }
+  const cls = positive
+    ? 'bg-[#F2F9F1] text-[#26472B] ring-[#D6EBCF]'
+    : negative
+    ? 'bg-red-50 text-red-700 ring-red-200'
+    : 'bg-[#F5F7F5] text-[#484848] ring-[#E5E7EB]';
+  const arrow = positive ? '↑' : negative ? '↓' : '•';
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-open-sauce-semibold ring-1 ${cls}`}>
+      <span className="leading-none">{arrow}</span>
+      <span>{display}</span>
+      {label && <span className="text-[10px] font-open-sauce text-current opacity-70">{label}</span>}
+    </span>
   );
 }
 
@@ -192,21 +343,58 @@ export function Spinner({ size = 'md' }) {
 }
 
 // ─── 6. EmptyState ────────────────────────────────────────────────────────────
-export function EmptyState({ message, icon }) {
+// EmptyState
+//
+// Improved empty state with explicit headline + body + CTA + optional help
+// link. Use this everywhere a list could be empty so non-technical users
+// always know exactly what to do next instead of staring at "No records".
+//
+// Backward compat: passing `message` alone still works (renders as headline).
+export function EmptyState({
+  message,
+  title,
+  description,
+  action,
+  helpHref,
+  helpLabel = 'Learn more',
+  icon,
+}) {
+  const headline = title || message || 'Nothing here yet';
   return (
-    <div className="rounded-2xl border border-dashed border-[#D6EBCF] bg-white py-12 text-center">
-      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[#F2F9F1] flex items-center justify-center">
+    <div className="rounded-2xl border border-dashed border-[#D6EBCF] bg-white py-14 px-6 text-center">
+      <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#F2F9F1] flex items-center justify-center ring-4 ring-[#F7FBF6]">
         {icon ? (
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <svg width={26} height={26} viewBox="0 0 24 24" fill="none">
             <path d={icon} stroke="#45A735" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         ) : (
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <svg width={26} height={26} viewBox="0 0 24 24" fill="none">
             <path d="M9 12h6M12 9v6M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#45A735" strokeWidth={1.6} strokeLinecap="round" />
           </svg>
         )}
       </div>
-      <div className="text-sm text-[#636363] font-open-sauce">{message || 'No data yet.'}</div>
+      <div className="text-base font-open-sauce-semibold text-[#26472B] mb-1">{headline}</div>
+      {description && (
+        <div className="text-sm text-[#636363] font-open-sauce max-w-md mx-auto mb-4">{description}</div>
+      )}
+      {(action || helpHref) && (
+        <div className="flex items-center justify-center gap-3 mt-3">
+          {action}
+          {helpHref && (
+            <a
+              href={helpHref}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-open-sauce-semibold text-[#45A735] hover:text-[#26472B] inline-flex items-center gap-1"
+            >
+              {helpLabel}
+              <svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+                <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -664,23 +852,143 @@ export function SearchInput({ value = '', onChange, placeholder = 'Search…' })
 }
 
 // ─── 17. SectionCard ──────────────────────────────────────────────────────────
-export function SectionCard({ title, subtitle, children, action, className = '' }) {
+export function SectionCard({
+  title,
+  subtitle,
+  description,
+  children,
+  action,
+  helpText,
+  className = '',
+  bodyClassName = '',
+}) {
   return (
     <div
       className={`bg-white rounded-2xl border border-[#E5F1E2] shadow-[0_1px_3px_rgba(38,71,43,0.04)] ${className}`}
     >
-      {title && (
-        <div className="px-5 pt-4 pb-3 border-b border-[#E5F1E2] flex items-center justify-between gap-3">
+      {(title || subtitle || description) && (
+        <div className="px-5 pt-4 pb-3 border-b border-[#E5F1E2] flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-sm font-open-sauce-bold text-[#26472B] leading-snug">{title}</div>
+            {title && (
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-open-sauce-bold text-[#26472B] leading-snug">{title}</div>
+                {helpText && <HelpTip text={helpText} />}
+              </div>
+            )}
             {subtitle && (
               <div className="text-xs text-[#636363] mt-0.5 font-open-sauce">{subtitle}</div>
+            )}
+            {description && (
+              <div className="text-xs text-[#909090] mt-1 font-open-sauce leading-relaxed max-w-2xl">{description}</div>
             )}
           </div>
           {action && <div className="flex-shrink-0">{action}</div>}
         </div>
       )}
-      <div className="px-5 py-4">{children}</div>
+      <div className={`px-5 py-4 ${bodyClassName}`}>{children}</div>
+    </div>
+  );
+}
+
+// ─── Card (lightweight container) ─────────────────────────────────────────────
+//
+// Use for content blocks that don't fit the SectionCard "header + body"
+// pattern — e.g. dashboard widgets, signup callouts, anything with a
+// custom layout where we just want the surface chrome.
+export function Card({ children, className = '', interactive = false, onClick, href }) {
+  const cls = `bg-white rounded-2xl border border-[#E5F1E2] shadow-[0_1px_3px_rgba(38,71,43,0.04)] ${
+    interactive
+      ? 'cursor-pointer hover:shadow-[0_8px_20px_rgba(69,167,53,0.10)] transition-shadow duration-200'
+      : ''
+  } ${className}`;
+  if (href) return <a href={href} className={cls}>{children}</a>;
+  if (onClick) return <button type="button" onClick={onClick} className={`${cls} text-left w-full`}>{children}</button>;
+  return <div className={cls}>{children}</div>;
+}
+
+// ─── FormSection ──────────────────────────────────────────────────────────────
+//
+// Visual grouping for form fields with a clear header + description and
+// optional help icon. Replaces the "naked stack of inputs" pattern that
+// makes long forms feel intimidating to non-technical admins.
+export function FormSection({ title, description, helpText, children, action, className = '' }) {
+  return (
+    <div className={`grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8 py-6 border-b border-[#E5F1E2] last:border-b-0 ${className}`}>
+      <div className="lg:col-span-1">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-open-sauce-bold text-[#26472B]">{title}</h3>
+          {helpText && <HelpTip text={helpText} />}
+        </div>
+        {description && (
+          <p className="mt-1 text-xs text-[#636363] font-open-sauce leading-relaxed max-w-xs">{description}</p>
+        )}
+        {action && <div className="mt-3">{action}</div>}
+      </div>
+      <div className="lg:col-span-2 space-y-4">{children}</div>
+    </div>
+  );
+}
+
+// ─── StickyActionBar ──────────────────────────────────────────────────────────
+//
+// Pinned-to-bottom save/cancel bar used inside large forms. Shows status
+// text on the left ("Saving…" / "All changes saved" / "Unsaved changes")
+// and the action group on the right. Use inside a scrollable container
+// so the bar floats above the form footer as the user scrolls.
+//
+// `position` accepts:
+//   'sticky'  — sticky bottom of nearest scroll container (default)
+//   'fixed'   — viewport-bottom fixed (use for full-screen edit modes)
+export function StickyActionBar({ status, statusKind = 'idle', children, position = 'sticky' }) {
+  const statusColours = {
+    idle:    'text-[#909090]',
+    saving:  'text-[#45A735]',
+    saved:   'text-[#26472B]',
+    error:   'text-red-700',
+    dirty:   'text-amber-700',
+  };
+  const cls = position === 'fixed'
+    ? 'fixed inset-x-0 bottom-0 z-30'
+    : 'sticky bottom-0 z-20';
+  return (
+    <div className={`${cls} bg-white border-t border-[#E5F1E2] shadow-[0_-2px_12px_rgba(38,71,43,0.06)]`}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        <div className={`text-xs font-open-sauce-semibold flex items-center gap-2 ${statusColours[statusKind] || statusColours.idle}`}>
+          {statusKind === 'saving' && (
+            <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          )}
+          {statusKind === 'saved' && (
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" className="text-[#45A735]">
+              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+          {statusKind === 'dirty' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
+          {status}
+        </div>
+        <div className="flex items-center gap-2">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── BulkBar ──────────────────────────────────────────────────────────────────
+//
+// Floating action bar for tables in multi-select mode — shows
+// "N selected" + bulk-action buttons. Hidden when count === 0.
+export function BulkBar({ count, onClear, children }) {
+  if (!count) return null;
+  return (
+    <div className="sticky top-2 z-10 mx-auto inline-flex items-center gap-3 bg-[#26472B] text-white rounded-full px-4 py-2 shadow-lg">
+      <span className="text-xs font-open-sauce-semibold">{count} selected</span>
+      <span className="w-px h-4 bg-white/20" />
+      <div className="flex items-center gap-1">{children}</div>
+      <button
+        type="button"
+        onClick={onClear}
+        className="ml-1 text-[10px] font-open-sauce text-white/70 hover:text-white"
+      >
+        Clear
+      </button>
     </div>
   );
 }
