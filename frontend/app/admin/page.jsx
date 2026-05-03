@@ -23,7 +23,7 @@
  *   • All interactive surfaces have hover affordances + focus rings.
  */
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import staffApi from '@/lib/axios/staffApi';
 import { staffAuth } from '@/lib/axios/staffApi';
@@ -92,36 +92,23 @@ export default function AdminDashboard() {
   const [errors, setErrors] = useState({});
   const [staffName, setStaffName] = useState('');
 
-  // Pull-everything fetch wrapped in a callback so the realtime listener
-  // can re-run it on demand. Quietly skips the Spinner on subsequent
-  // refetches (we keep the previous data on screen until the new data
-  // lands — avoids a "blink to empty" effect when the dashboard is
-  // alive and updating in the background).
-  const loadDashboard = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    const results = await Promise.allSettled([
-      staffApi.get('/admin/dashboard/stats'),
-      staffApi.get('/admin/dashboard/revenue'),
-      staffApi.get('/admin/dashboard/recent-activity'),
-      staffApi.get('/admin/dashboard'),
-      staffApi.get('/admin-ops/refunds?status=pending&pageSize=1').catch(() => null),
-      staffApi.get('/admin-ops/payouts?status=pending&pageSize=1').catch(() => null),
-      staffApi.get('/admin/tickets?status=open&pageSize=1').catch(() => null),
-      staffApi.get('/admin/payments?status=created&pageSize=1').catch(() => null),
-    ]);
-    return results;
-  }, []);
-
   useEffect(() => {
     const u = staffAuth.getUser();
     if (u?.name) queueMicrotask(() => setStaffName(u.name));
 
-    // queueMicrotask lifts loadDashboard()'s setLoading(true) out of
-    // the synchronous effect path so react-hooks/set-state-in-effect
-    // stays happy. Behaviour is identical — the spinner shows on the
-    // very next tick.
-    queueMicrotask(() => {
-    loadDashboard().then((results) => {
+    Promise.allSettled([
+      staffApi.get('/admin/dashboard/stats'),
+      staffApi.get('/admin/dashboard/revenue'),
+      staffApi.get('/admin/dashboard/recent-activity'),
+      staffApi.get('/admin/dashboard'),
+      // Needs-attention pulls — each is a tiny pageSize=1 query so we
+      // only need meta.total for the count. Soft-fails so a single
+      // missing route doesn't break the whole panel.
+      staffApi.get('/admin-ops/refunds?status=pending&pageSize=1').catch(() => null),
+      staffApi.get('/admin-ops/payouts?status=pending&pageSize=1').catch(() => null),
+      staffApi.get('/admin/tickets?status=open&pageSize=1').catch(() => null),
+      staffApi.get('/admin/payments?status=created&pageSize=1').catch(() => null),
+    ]).then((results) => {
       const [statsRes, revenueRes, activityRes, dashRes, refundsRes, payoutsRes, ticketsRes, pendingPaymentsRes] = results;
       const errs = {};
 
@@ -178,48 +165,7 @@ export default function AdminDashboard() {
       setErrors(errs);
       setLoading(false);
     });
-    });
-  }, [loadDashboard]);
-
-  // Real-time refresh: every backend admin event (booking:new,
-  // booking:status, fraud:alert, etc.) is bridged to a window
-  // 'admin:event' CustomEvent by SocketProvider. We coalesce bursts
-  // through a 1.5s debounce so 50 booking-status flips in a row only
-  // trigger one refetch, then silently re-pull the dashboard data.
-  useEffect(() => {
-    let timer = null;
-    const handler = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        loadDashboard(true).then((results) => {
-          const [statsRes, revenueRes, activityRes, dashRes, refundsRes, payoutsRes, ticketsRes, pendingPaymentsRes] = results;
-          if (statsRes.status === 'fulfilled') setStats(statsRes.value.data?.data || statsRes.value.data || null);
-          if (revenueRes.status === 'fulfilled') {
-            const raw = revenueRes.value.data?.data || revenueRes.value.data;
-            setRevenueData(Array.isArray(raw) ? raw : []);
-          }
-          if (activityRes.status === 'fulfilled') {
-            const raw = activityRes.value.data?.data || activityRes.value.data;
-            setRecentActivity(Array.isArray(raw) ? raw : []);
-          }
-          if (dashRes.status === 'fulfilled') {
-            setBookingsByStatus(dashRes.value.data?.data?.bookingsByStatus || {});
-          }
-          setNeedsAttention({
-            pendingRefunds:  refundsRes?.value?.data?.meta?.total ?? 0,
-            pendingPayouts:  payoutsRes?.value?.data?.meta?.total ?? 0,
-            openTickets:     ticketsRes?.value?.data?.meta?.total ?? 0,
-            pendingPayments: pendingPaymentsRes?.value?.data?.data?.total ?? 0,
-          });
-        });
-      }, 1500);
-    };
-    window.addEventListener('admin:event', handler);
-    return () => {
-      window.removeEventListener('admin:event', handler);
-      if (timer) clearTimeout(timer);
-    };
-  }, [loadDashboard]);
+  }, []);
 
   const maxRev = Math.max(...revenueData.map((r) => r.revenue ?? 0), 1);
   const greeting = useMemo(() => greetingForHour(new Date().getHours()), []);

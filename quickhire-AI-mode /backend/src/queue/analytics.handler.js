@@ -151,68 +151,24 @@ async function handleProcessGatewayRefund(data, jobId) {
    Rates are stored in the `fx_rates` collection, not used for payment amounts.
 ────────────────────────────────────────────────────────────────── */
 
-// Static fallback rates (relative to INR, ~Q1 2026 averages). Used when
-// the live FX endpoint is unreachable so display-only conversion still
-// has *some* answer. Source-of-truth for the rates the frontend used to
-// hardcode in lib/i18n/config.js.
-const STATIC_RATES = {
-  INR: 1,
-  USD: 0.012,
-  EUR: 0.011,
-  GBP: 0.0095,
-  AED: 0.044,
-  AUD: 0.018,
-  SGD: 0.016,
-  CAD: 0.016,
-  SAR: 0.045,
-};
-
-const FX_TARGETS = ['USD', 'EUR', 'GBP', 'AED', 'AUD', 'SGD', 'CAD', 'SAR'];
-
-/**
- * Pull live rates from frankfurter.app — free, public, no API key, ECB
- * sourced, daily updates. We ask for INR → all targets and store the
- * inverse (target → INR) shape that the rest of the app expects.
- *
- * Returns null on any failure so callers can fall back to STATIC_RATES.
- */
-async function fetchLiveRates() {
-  if (typeof fetch !== 'function') return null;
-  try {
-    const url = `https://api.frankfurter.app/latest?from=INR&to=${FX_TARGETS.join(',')}`;
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 8000);
-    const res = await fetch(url, { signal: ctl.signal });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const json = await res.json();
-    const r = json?.rates || {};
-    // Frankfurter returns "INR=1 USD=0.012 …" — exactly the shape we
-    // already store. Sanity-check each rate is a positive number.
-    const cleaned = { INR: 1 };
-    for (const code of FX_TARGETS) {
-      const v = Number(r[code]);
-      if (Number.isFinite(v) && v > 0) cleaned[code] = v;
-    }
-    // If we got fewer than 4 currencies the API probably hiccuped —
-    // treat as failure so we fall back rather than half-update the
-    // pricing surface.
-    if (Object.keys(cleaned).length < 5) return null;
-    return cleaned;
-  } catch {
-    return null;
-  }
-}
-
 async function handleRefreshFxRates(jobId) {
   const db = getDb();
   const now = new Date();
 
-  const live = await fetchLiveRates();
+  // Static display-only rates relative to INR (source of truth: frontend/lib/i18n/config.js)
+  // In production, integrate with an FX API (e.g. Open Exchange Rates, Fixer.io)
   const rates = {
-    ...(live || STATIC_RATES),
+    INR: 1,
+    USD: 0.012,
+    EUR: 0.011,
+    GBP: 0.0095,
+    AED: 0.044,
+    AUD: 0.018,
+    SGD: 0.016,
+    CAD: 0.016,
+    SAR: 0.045,
     updatedAt: now,
-    source: live ? 'frankfurter' : 'static_fallback',
+    source: 'static_fallback', // change to 'api' when live FX integration is added
   };
 
   await db.collection('fx_rates').replaceOne(
@@ -221,11 +177,8 @@ async function handleRefreshFxRates(jobId) {
     { upsert: true },
   );
 
-  logger.info(
-    { jobId, source: rates.source, count: Object.keys(rates).filter((k) => k !== 'updatedAt' && k !== 'source').length },
-    'fx rates refreshed',
-  );
-  return { success: true, updatedAt: now, source: rates.source };
+  logger.info({ jobId, rates: Object.keys(rates).filter((k) => k !== 'updatedAt' && k !== 'source') }, 'fx rates refreshed');
+  return { success: true, updatedAt: now };
 }
 
 /* ──────────────────────────────────────────────────────────────────

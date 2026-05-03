@@ -33,7 +33,6 @@ import {
   Modal,
 } from '@/components/staff/ui';
 import { showError } from '@/lib/utils/toast';
-import { downloadAuthed } from '@/lib/utils/downloadAuthed';
 
 const CURRENCY_SYMBOLS = {
   INR: '₹', USD: '$', AED: 'د.إ', EUR: '€', GBP: '£', AUD: 'A$', SGD: 'S$', CAD: 'C$', SAR: 'SR',
@@ -43,15 +42,6 @@ const STATUS_OPTIONS = ['', 'created', 'paid', 'failed', 'refunded', 'cancelled'
 const COUNTRY_OPTIONS = ['', 'IN', 'AE', 'DE', 'US', 'AU', 'GB', 'SA', 'SG'];
 const CURRENCY_OPTIONS = ['', 'INR', 'AED', 'EUR', 'USD', 'AUD', 'GBP', 'SGD', 'SAR'];
 const GATEWAY_OPTIONS = ['', 'razorpay', 'stripe', 'mock'];
-
-async function exportPayments(queryString) {
-  try {
-    const stamp = new Date().toISOString().slice(0, 10);
-    await downloadAuthed(`/admin/payments.csv?${queryString}`, `payments-${stamp}.csv`);
-  } catch (e) {
-    showError(e?.response?.status === 401 ? 'Session expired — please sign in again.' : 'Failed to export payments.');
-  }
-}
 
 function fmtMoney(amount, currency) {
   const symbol = CURRENCY_SYMBOLS[currency] || (currency ? currency + ' ' : '');
@@ -251,12 +241,7 @@ export default function AdminPaymentsPage() {
       <PageHeader
         title="Payments"
         subtitle="Every transaction across countries, currencies, and gateways"
-        helpText="Click a transaction ID to see customer, job, and full invoice breakdown. KPIs are grouped by currency so you never mix INR with EUR totals. Use Export CSV to pull rows matching the current filters."
-        action={
-          <Button variant="subtle" onClick={() => exportPayments(queryString)}>
-            Export CSV
-          </Button>
-        }
+        helpText="Click a transaction ID to see customer, job, and full invoice breakdown. KPIs are grouped by currency so you never mix INR with EUR totals."
       />
 
       {/* KPIs — one stat card per active currency */}

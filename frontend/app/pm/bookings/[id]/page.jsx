@@ -176,12 +176,7 @@ export default function PmBookingDetailPage() {
 
   const svc = job.services?.[0] || {};
   const status = job.status;
-  // PM hasn't accepted the assignment yet — surface big Accept / Decline
-  // buttons before the work-control buttons. Mirrors the resource flow
-  // and removes the previous "PM has the job but no obvious next step"
-  // dead end.
-  const needsPmAcceptance = !job.pmAcceptedAt && job.pmId;
-  const canStart = !needsPmAcceptance && ['assigned_to_pm', 'paid', 'confirmed', 'paused'].includes(status);
+  const canStart = ['assigned_to_pm', 'paid', 'confirmed', 'paused'].includes(status);
   const canStop = status === 'in_progress';
   const canComplete = ['in_progress', 'paused'].includes(status);
 
@@ -219,27 +214,6 @@ export default function PmBookingDetailPage() {
               </div>
             )}
             <div className="flex gap-2 flex-wrap mt-5 border-t border-[#E5F1E2] pt-4">
-              {needsPmAcceptance && (
-                <>
-                  <Button variant="primary" onClick={() => action('accept')} disabled={!!busy}>
-                    {busy === 'accept' ? 'Accepting…' : '✓ Accept assignment'}
-                  </Button>
-                  <Button variant="danger" onClick={() => action('decline')} disabled={!!busy}>
-                    {busy === 'decline' ? 'Declining…' : '✗ Decline'}
-                  </Button>
-                  <span className="text-xs text-[#909090] self-center ml-2">
-                    Decline returns the booking to the admin for reassignment.
-                  </span>
-                </>
-              )}
-              {!needsPmAcceptance && job.pmAcceptedAt && (
-                <span className="text-xs text-[#26472B] inline-flex items-center gap-1.5 self-center">
-                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-                    <path d="M5 13l4 4L19 7" stroke="#45A735" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Accepted
-                </span>
-              )}
               {canStart && (
                 <Button variant="primary" onClick={() => action('start')} disabled={!!busy}>
                   {busy === 'start' ? 'Starting…' : (status === 'paused' ? 'Resume Work' : 'Start Work')}

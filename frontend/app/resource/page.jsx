@@ -27,7 +27,6 @@ import {
   StatusBadge,
 } from '@/components/staff/ui';
 import { s } from '@/lib/utils/i18nText';
-import { showError, showSuccess } from '@/lib/utils/toast';
 
 function greetingForHour(h) {
   if (h < 12) return 'Good morning';
@@ -43,8 +42,6 @@ export default function ResourceDashboard() {
   const [recentLogs, setRecentLogs] = useState([]);
   const [error, setError] = useState(null);
   const [staffName, setStaffName] = useState('');
-  const [availability, setAvailability] = useState('offline');
-  const [availabilityBusy, setAvailabilityBusy] = useState(false);
   const greeting = useMemo(() => greetingForHour(new Date().getHours()), []);
 
   useEffect(() => {
@@ -55,8 +52,7 @@ export default function ResourceDashboard() {
       staffApi.get('/resource/dashboard'),
       staffApi.get('/resource/assignments?pageSize=5'),
       staffApi.get('/resource/time-logs?pageSize=5'),
-      staffApi.get('/resource/me'),
-    ]).then(([dashRes, asgRes, logsRes, meRes]) => {
+    ]).then(([dashRes, asgRes, logsRes]) => {
       if (dashRes.status === 'fulfilled') {
         setData(dashRes.value.data?.data);
       } else {
@@ -68,27 +64,8 @@ export default function ResourceDashboard() {
       if (logsRes.status === 'fulfilled') {
         setRecentLogs(logsRes.value.data?.data || []);
       }
-      if (meRes.status === 'fulfilled') {
-        setAvailability(meRes.value.data?.data?.availability || 'offline');
-      }
     });
   }, []);
-
-  const toggleAvailability = async () => {
-    const next = availability === 'online' ? 'offline' : 'online';
-    setAvailabilityBusy(true);
-    // Optimistic update — flip the badge immediately, roll back on error.
-    setAvailability(next);
-    try {
-      await staffApi.post('/resource/availability', { availability: next });
-      showSuccess(next === 'online' ? "You're now visible to PMs for new work" : "You're set to offline");
-    } catch (e) {
-      setAvailability(availability);
-      showError(e?.response?.data?.error?.message || 'Failed to update availability');
-    } finally {
-      setAvailabilityBusy(false);
-    }
-  };
 
   const needsAcceptance = assignments.filter((a) => !a.resourceAcceptedAt).length;
   // Mounted-once anchor for "this week" so re-renders don't shift the
@@ -128,30 +105,6 @@ export default function ResourceDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Availability toggle — single click flips between online
-                  (visible to PMs for new work) and offline (no new
-                  assignments incoming; existing work unaffected). */}
-              <button
-                type="button"
-                onClick={toggleAvailability}
-                disabled={availabilityBusy}
-                className={`group inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-open-sauce-semibold transition-colors disabled:opacity-60 ${
-                  availability === 'online'
-                    ? 'bg-[#F2F9F1] text-[#26472B] ring-1 ring-[#D6EBCF] hover:bg-[#E5F1E2]'
-                    : 'bg-[#F5F7F5] text-[#636363] ring-1 ring-[#E5E7EB] hover:bg-white'
-                }`}
-                aria-label={`Currently ${availability}, click to toggle`}
-              >
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    availability === 'online' ? 'bg-[#45A735] shadow-[0_0_0_3px_rgba(69,167,53,0.18)]' : 'bg-[#D1D5DB]'
-                  }`}
-                />
-                {availability === 'online' ? 'Online' : 'Offline'}
-                <span className="text-[10px] text-[#909090] hidden sm:inline group-hover:text-[#26472B] transition-colors">
-                  {availability === 'online' ? '· tap to go offline' : '· tap to go online'}
-                </span>
-              </button>
               <Button variant="primary" size="md" onClick={() => router.push('/resource/assignments')}>
                 Open assignments
               </Button>

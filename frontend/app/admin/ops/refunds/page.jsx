@@ -365,26 +365,6 @@ export default function AdminOpsRefundsPage() {
       <PageHeader
         title="Refunds"
         subtitle="Review and process refund requests"
-        helpText="Approving a refund triggers the gateway-side refund call (Razorpay/Stripe) and emails the customer. Use Export CSV for finance reconciliation."
-        secondaryActions={[
-          <Button
-            key="export"
-            variant="subtle"
-            onClick={async () => {
-              try {
-                const stamp = new Date().toISOString().slice(0, 10);
-                const params = new URLSearchParams();
-                if (tab !== 'All') params.set('status', tab);
-                const { downloadAuthed } = await import('@/lib/utils/downloadAuthed');
-                await downloadAuthed(`/admin-ops/refunds.csv?${params.toString()}`, `refunds-${stamp}.csv`);
-              } catch {
-                showError('Failed to export refunds.');
-              }
-            }}
-          >
-            Export CSV
-          </Button>,
-        ]}
         action={
           <Button variant="primary" onClick={() => setShowCreate(true)}>
             + Create Refund

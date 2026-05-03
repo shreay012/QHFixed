@@ -433,26 +433,8 @@ export default function AdminOpsPayoutsPage() {
       <PageHeader
         title="Payouts"
         subtitle="Manage resource and PM payouts"
-        helpText="Compute payouts per cycle, mark them processed once paid out, and reconcile against bank statements. Export CSV for accounting."
         action={
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="subtle"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const stamp = new Date().toISOString().slice(0, 10);
-                  const params = new URLSearchParams();
-                  if (tab !== 'All') params.set('status', tab);
-                  const { downloadAuthed } = await import('@/lib/utils/downloadAuthed');
-                  await downloadAuthed(`/admin-ops/payouts.csv?${params.toString()}`, `payouts-${stamp}.csv`);
-                } catch {
-                  showError('Failed to export payouts.');
-                }
-              }}
-            >
-              Export CSV
-            </Button>
             <Button variant="primary" size="sm" onClick={() => setShowCompute(true)}>+ Compute Payout</Button>
             <Button variant="subtle" size="sm" onClick={() => setShowRecon(true)}>📊 Reconciliation</Button>
           </div>
