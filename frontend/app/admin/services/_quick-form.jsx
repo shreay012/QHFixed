@@ -79,14 +79,34 @@ export default function QuickServiceForm({ serviceId = null, initialData = null 
     hourlyRate:   initialData?.hourlyRate ?? initialData?.pricing?.hourly ?? '',
     technologies: techToString(initialData?.technologies),
     imageUrl:     initialData?.imageUrl || initialData?.image || '',
+    iconUrl:      initialData?.iconUrl || '',
+    sortOrder:    initialData?.sortOrder ?? 999,
     active:       initialData?.active !== undefined ? initialData.active : true,
   }));
 
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
   const [err, setErr] = useState(null);
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleIconUpload = async (file) => {
+    if (!file) return;
+    if (file.size > 1 * 1024 * 1024) { showError('Icon must be 1 MB or smaller.'); return; }
+    const fd = new FormData();
+    fd.append('image', file);
+    setUploadingIcon(true);
+    try {
+      const r = await staffApi.post('/cms-x/banners/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url = r.data?.data?.url;
+      if (!url) throw new Error('Upload returned no URL');
+      set('iconUrl', url);
+      showSuccess('Icon uploaded.');
+    } catch (e) {
+      showError(e?.response?.data?.error?.message || 'Icon upload failed.');
+    } finally { setUploadingIcon(false); }
+  };
 
   // Image upload — reuses the CMS banner upload endpoint since it accepts
   // any image and writes to the same S3 bucket. Falls back gracefully if
@@ -146,6 +166,8 @@ export default function QuickServiceForm({ serviceId = null, initialData = null 
       technologies: techArr,
       hourlyRate:   Number(form.hourlyRate) || 0,
       imageUrl:     form.imageUrl.trim() || '',
+      iconUrl:      form.iconUrl.trim() || '',
+      sortOrder:    Number(form.sortOrder) || 999,
       active:       form.active,
     };
 
@@ -311,6 +333,49 @@ export default function QuickServiceForm({ serviceId = null, initialData = null 
               ))}
             </div>
           )}
+        </div>
+
+        {/* Icon (SVG) + Sort Order — side by side */}
+        <div className="bg-white rounded-2xl border border-[#E5F1E2] p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {/* Icon */}
+          <div>
+            <label className={labelCls}>Service Icon <span className="text-[#909090] normal-case font-normal">— SVG/PNG, shown on cards</span></label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={form.iconUrl}
+                onChange={(e) => set('iconUrl', e.target.value)}
+                placeholder="Paste SVG/PNG URL or upload →"
+                className={inputCls}
+              />
+              <label className={`inline-flex items-center justify-center px-3 py-2.5 rounded-lg border border-[#45A735] text-[#26472B] text-xs font-open-sauce-semibold cursor-pointer hover:bg-[#F2F9F1] whitespace-nowrap ${uploadingIcon ? 'opacity-60 cursor-wait' : ''}`}>
+                {uploadingIcon ? '⏳' : '📤'}
+                <input type="file" accept="image/svg+xml,image/png,image/webp" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleIconUpload(f); e.target.value = ''; }} disabled={uploadingIcon} className="hidden" />
+              </label>
+            </div>
+            {form.iconUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.iconUrl} alt="icon" className="mt-2 h-12 w-12 object-contain rounded border border-[#E5F1E2] p-1 bg-[#f8fdf7]" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            )}
+            <p className="text-[11px] text-[#909090] mt-1.5">Recommended: SVG or 64×64 PNG. Max 1 MB.</p>
+          </div>
+
+          {/* Sort Order */}
+          <div>
+            <label className={labelCls}>Display Priority <span className="text-[#909090] normal-case font-normal">— lower = first</span></label>
+            <input
+              type="number"
+              value={form.sortOrder}
+              onChange={(e) => set('sortOrder', e.target.value)}
+              placeholder="e.g. 1"
+              min={1}
+              max={9999}
+              className={inputCls}
+            />
+            <p className="text-[11px] text-[#909090] mt-1.5">
+              1 = show first. 999 = default / no preference. Controls order on homepage & catalogue.
+            </p>
+          </div>
         </div>
 
         {/* Image */}

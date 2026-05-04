@@ -28,6 +28,20 @@ export default function AdminServicesPage() {
   const [q, setQ]                   = useState('');
   const [activeFilter, setActiveFilter] = useState('');
   const [page, setPage]             = useState(1);
+  const [bulkImporting, setBulkImporting] = useState(false);
+
+  const downloadSampleCsv = () => {
+    const header = 'slug,name_en,name_hi,name_ar,name_de,tagline,category,description_en,technologies,hourly_rate_inr,image_url,icon_url,sort_order,active';
+    const row1   = 'ai-engineer,AI Engineer,एआई इंजीनियर,مهندس الذكاء الاصطناعي,KI-Ingenieur,Build AI-powered products fast,AI Engineers,Hire pre-vetted AI engineers for your product team.,TensorFlow|PyTorch|LangChain|Python,2500,https://cdn.example.com/ai.jpg,https://cdn.example.com/ai-icon.svg,1,true';
+    const row2   = 'frontend-developer,Frontend Developer,,,, Build stunning UIs,Frontend Development,Expert React & Next.js developers ready to ship.,React|Next.js|TypeScript|Tailwind,2000,,,2,true';
+    const row3   = 'devops-engineer,DevOps Engineer,,,,Cloud & CI/CD experts,DevOps,Scale your infrastructure with certified DevOps engineers.,AWS|Docker|Kubernetes|Terraform,2200,,,3,true';
+    const csv    = [header, row1, row2, row3].join('\n');
+    const blob   = new Blob([csv], { type: 'text/csv' });
+    const a      = document.createElement('a');
+    a.href       = URL.createObjectURL(blob);
+    a.download   = 'quickhire-services-sample.csv';
+    a.click();
+  };
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -174,6 +188,15 @@ export default function AdminServicesPage() {
       },
     },
     {
+      key: 'sortOrder',
+      label: 'Priority',
+      render: (s) => (
+        <span className="text-sm text-[#636363] font-mono">
+          {s.sortOrder != null && s.sortOrder !== 999 ? `#${s.sortOrder}` : '—'}
+        </span>
+      ),
+    },
+    {
       key: 'faqs',
       label: 'FAQs',
       render: (s) => {
@@ -236,9 +259,34 @@ export default function AdminServicesPage() {
         subtitle={t('subtitle')}
         helpText="Services power the entire booking catalogue. Edit copy / pricing / FAQs without a deploy."
         action={
-          <Button variant="primary" onClick={() => router.push('/admin/services/new')}>
-            + New Service
-          </Button>
+          <div className="flex items-center gap-2">
+            <label className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#45A735] text-[#26472B] text-sm font-medium cursor-pointer hover:bg-[#F2F9F1] transition-colors ${bulkImporting ? 'opacity-60 cursor-wait' : ''}`}>
+              {bulkImporting ? '⏳ Importing…' : '📥 Bulk Import CSV'}
+              <input type="file" accept=".csv" className="hidden" disabled={bulkImporting}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0]; e.target.value = '';
+                  if (!f) return;
+                  setBulkImporting(true);
+                  try {
+                    const fd = new FormData(); fd.append('file', f);
+                    const r = await staffApi.post('/admin/services/bulk-import', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    const d = r.data?.data;
+                    showSuccess(`Done! Created: ${d.created}, Updated: ${d.updated}${d.errors?.length ? `, Errors: ${d.errors.length}` : ''}`);
+                    if (d.errors?.length) console.warn('Bulk import errors:', d.errors);
+                    load();
+                  } catch (ex) {
+                    showError(ex?.response?.data?.error?.message || 'Bulk import failed');
+                  } finally { setBulkImporting(false); }
+                }}
+              />
+            </label>
+            <button onClick={downloadSampleCsv} className="px-3 py-2 rounded-lg border border-[#D0E8CB] text-[#555] text-sm hover:bg-[#F2F9F1] transition-colors">
+              📄 Sample CSV
+            </button>
+            <Button variant="primary" onClick={() => router.push('/admin/services/new')}>
+              + New Service
+            </Button>
+          </div>
         }
       />
       <div className="p-4 sm:p-8 space-y-4">
