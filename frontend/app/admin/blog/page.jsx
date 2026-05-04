@@ -155,7 +155,7 @@ export default function AdminBlogPage() {
                       <div className="flex items-center justify-end gap-2">
                         {/* View live */}
                         {post.status === 'published' && (
-                          <a href={`/blog/${post.slug}`} target="_blank" rel="noopener"
+                          <a href={`/industry-perspectives/${post.slug}`} target="_blank" rel="noopener"
                              className="text-xs text-[#45A735] hover:underline">View</a>
                         )}
                         {/* Quick publish/unpublish */}
