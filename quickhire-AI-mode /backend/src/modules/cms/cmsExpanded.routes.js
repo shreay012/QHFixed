@@ -11,6 +11,9 @@
  */
 import { Router } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import { nanoid } from 'nanoid';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { adminGuard, permGuard } from '../../middleware/role.middleware.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
@@ -21,6 +24,8 @@ import { toObjectId } from '../../utils/oid.js';
 import { paginate, buildMeta } from '../../utils/pagination.js';
 import { PERMS } from '../../config/rbac.js';
 import { redis } from '../../config/redis.js';
+import { s3 } from '../../config/aws.js';
+import { env } from '../../config/env.js';
 
 const r = Router();
 
@@ -150,6 +155,10 @@ const POSITION_ENUM = z.enum([
   'services-top', 'service-detail-top',
   'booking-flow-top', 'checkout-top',
   'profile-top', 'cart-top', 'search-top',
+  // Featured banners — shared across home / how-it-works / book-your-resource.
+  // Single CMS record drives all three surfaces so admins change copy + image
+  // (per country + per locale) in one place without a deploy.
+  'featured-find-experts',
   // Legacy values kept for back-compat with existing DB records
   'hero', 'inline', 'popup', 'sidebar',
   'homepage_hero', 'homepage_mid',
@@ -328,6 +337,48 @@ r.delete('/banners/:id', adminGuard, permGuard(PERMS.CMS_WRITE), asyncHandler(as
   await bannersCol().deleteOne({ _id: toObjectId(req.params.id) });
   res.json({ success: true });
 }));
+
+/**
+ * Admin: upload a banner image directly from the file picker. Sends to
+ * S3 if configured, otherwise returns 501 so the admin falls back to the
+ * URL-paste field. Limit 5 MB; PNG / JPG / WEBP / SVG only.
+ *
+ * The returned URL is dropped straight into the form's mediaUrl field —
+ * country-specific banners just upload their own image per record, no
+ * extra wiring needed.
+ */
+const bannerUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /^image\/(png|jpe?g|webp|svg\+xml)$/.test(file.mimetype || '');
+    cb(ok ? null : new AppError('VALIDATION_ERROR', 'Only PNG/JPG/WEBP/SVG up to 5 MB', 400), ok);
+  },
+});
+
+r.post('/banners/upload',
+  adminGuard,
+  permGuard(PERMS.CMS_WRITE),
+  bannerUpload.single('image'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new AppError('VALIDATION_ERROR', 'No file uploaded', 400);
+    if (!env.S3_BUCKET_CHAT) {
+      // S3 not configured — admin can still paste a URL into the form.
+      throw new AppError('NOT_IMPLEMENTED', 'Image upload requires S3 to be configured. Paste a URL instead.', 501);
+    }
+    const ext = (req.file.originalname.match(/\.[a-z0-9]+$/i) || [''])[0];
+    const key = `cms/banners/${nanoid(12)}${ext}`;
+    await s3.send(new PutObjectCommand({
+      Bucket: env.S3_BUCKET_CHAT,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+      CacheControl: 'public, max-age=31536000, immutable',
+    }));
+    const url = `https://${env.S3_BUCKET_CHAT}.s3.${env.AWS_REGION}.amazonaws.com/${key}`;
+    res.status(201).json({ success: true, data: { url, key, size: req.file.size, contentType: req.file.mimetype } });
+  })
+);
 
 /**
  * Admin: drop the starter banner set into cms_banners. Same idempotent

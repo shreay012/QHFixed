@@ -40,6 +40,7 @@ const LOCALES = [
 ];
 
 const POSITIONS = [
+  { value: 'featured-find-experts', label: '⭐ Featured Banner — Find Experts (Home + How-it-works + Book)' },
   { value: 'home-hero',           label: 'Home — Hero' },
   { value: 'home-secondary',      label: 'Home — Secondary' },
   { value: 'home-mid',            label: 'Home — Mid' },
@@ -52,6 +53,16 @@ const POSITIONS = [
   { value: 'cart-top',            label: 'Cart — Top' },
   { value: 'search-top',          label: 'Search — Top' },
 ];
+
+// Image-size guide — surfaced inline in the form so admins know what
+// dimensions/format to use per variant before they upload. These are
+// recommendations, not hard limits.
+const MEDIA_GUIDE = {
+  simple:        { dims: '1000×1000px',  format: 'PNG (transparent BG) or JPG', max: '500 KB' },
+  'expert-match':{ dims: '800×800px (per expert avatar)', format: 'JPG / PNG', max: '300 KB each' },
+  'video-hero':  { dims: '1920×1080px',  format: 'MP4 (H.264)',                 max: '5 MB' },
+  split:         { dims: '1200×800px',   format: 'JPG',                         max: '600 KB' },
+};
 const POSITION_LABEL = Object.fromEntries(POSITIONS.map((p) => [p.value, p.label]));
 
 const VARIANTS = [
@@ -177,6 +188,18 @@ function BannerModal({ banner, onClose, onSaved }) {
   const [activeLocale, setActiveLocale] = useState('en');
   const [saving, setSaving] = useState(false);
   const [fieldErr, setFieldErr] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Featured banner is single-image only. The expert-match (multi-card)
+  // variant doesn't fit this slot, so we hide that variant entirely and
+  // pin the value to 'simple' whenever the position is featured-find-experts.
+  const isFeaturedFindExperts = form.position === 'featured-find-experts';
+
+  useEffect(() => {
+    if (isFeaturedFindExperts && form.variant !== 'simple') {
+      setForm((p) => ({ ...p, variant: 'simple', experts: [] }));
+    }
+  }, [isFeaturedFindExperts, form.variant]);
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape' && !saving) onClose(); };
@@ -186,6 +209,43 @@ function BannerModal({ banner, onClose, onSaved }) {
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   const setI18n = (key, locale, v) => setForm((p) => ({ ...p, [key]: { ...p[key], [locale]: v } }));
+
+  // Upload a file via /cms-x/banners/upload → returns S3 URL → drops it
+  // into the target form field. `target` is the form key to update
+  // ('mediaUrl' for the main image, or a locale code for the per-locale
+  // override map).
+  const uploadImage = async (file, target = 'mediaUrl') => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showError('Image must be 5 MB or smaller.');
+      return;
+    }
+    const fd = new FormData();
+    fd.append('image', file);
+    setUploading(true);
+    try {
+      const r = await staffApi.post('/cms-x/banners/upload', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const url = r.data?.data?.url;
+      if (!url) throw new Error('Upload did not return a URL');
+      if (target === 'mediaUrl') {
+        set('mediaUrl', url);
+      } else {
+        // per-locale override
+        setForm((p) => ({
+          ...p,
+          mediaUrlByLocale: { ...(p.mediaUrlByLocale || {}), [target]: url },
+        }));
+      }
+      showSuccess('Image uploaded.');
+    } catch (err) {
+      const msg = err?.response?.data?.error?.message || err?.message || 'Upload failed.';
+      showError(msg);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -319,9 +379,24 @@ function BannerModal({ banner, onClose, onSaved }) {
             </div>
             <div>
               <label className={labelCls()}>Variant</label>
-              <select value={form.variant} onChange={(e) => set('variant', e.target.value)} className={inputCls()}>
-                {VARIANTS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
-              </select>
+              {isFeaturedFindExperts ? (
+                <>
+                  <input
+                    type="text"
+                    value="Simple — single image (locked for Featured Banner)"
+                    className={inputCls('bg-[#F2F9F1] cursor-not-allowed text-[#26472B]')}
+                    disabled
+                    readOnly
+                  />
+                  <p className="text-[10px] text-[#909090] mt-1">
+                    Featured Banner uses one image per record. Create a separate banner per country for country-specific creatives.
+                  </p>
+                </>
+              ) : (
+                <select value={form.variant} onChange={(e) => set('variant', e.target.value)} className={inputCls()}>
+                  {VARIANTS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                </select>
+              )}
             </div>
           </div>
 
@@ -398,24 +473,74 @@ function BannerModal({ banner, onClose, onSaved }) {
 
           {/* Media — only relevant when variant uses media */}
           {form.variant !== 'expert-match' && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className={labelCls()}>Media type</label>
-                <select value={form.mediaType} onChange={(e) => set('mediaType', e.target.value)} className={inputCls()}>
-                  <option value="image">Image</option>
-                  <option value="video">Video</option>
-                </select>
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelCls()}>Media type</label>
+                  <select value={form.mediaType} onChange={(e) => set('mediaType', e.target.value)} className={inputCls()}>
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={labelCls()}>Media URL</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={form.mediaUrl}
+                      onChange={(e) => set('mediaUrl', e.target.value)}
+                      placeholder={form.mediaType === 'video' ? 'https://cdn.example.com/hero.mp4' : 'Paste URL or use Upload →'}
+                      className={inputCls()}
+                    />
+                    {form.mediaType === 'image' && (
+                      <label
+                        className={`inline-flex items-center justify-center px-3 py-2 rounded-lg border border-[#45A735] text-[#26472B] text-xs font-open-sauce-semibold cursor-pointer hover:bg-[#F2F9F1] whitespace-nowrap ${uploading ? 'opacity-60 cursor-wait' : ''}`}
+                        title="Upload image to S3"
+                      >
+                        {uploading ? '⏳ Uploading…' : '📤 Upload'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) uploadImage(f, 'mediaUrl');
+                            e.target.value = '';
+                          }}
+                          disabled={uploading}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                  {/* Live preview of the uploaded/pasted image so admin sees it immediately */}
+                  {form.mediaUrl && form.mediaType === 'image' && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.mediaUrl}
+                      alt="Preview"
+                      className="mt-2 h-20 w-20 object-cover rounded-md border border-[#E5F1E2]"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls()}>Media URL</label>
-                <input
-                  type="text"
-                  value={form.mediaUrl}
-                  onChange={(e) => set('mediaUrl', e.target.value)}
-                  placeholder={form.mediaType === 'video' ? 'https://cdn.example.com/hero.mp4' : 'https://cdn.example.com/hero.jpg'}
-                  className={inputCls()}
-                />
-              </div>
+              {/* Size guide — keeps admins from uploading 6MB hero PNGs */}
+              {(() => {
+                const g = MEDIA_GUIDE[form.variant] || MEDIA_GUIDE.simple;
+                return (
+                  <div className="rounded-lg border border-[#D6EBCF] bg-[#F2F9F1] px-3 py-2 text-[11px] font-open-sauce text-[#26472B] flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="font-open-sauce-semibold">📐 Image guide ({form.variant}):</span>
+                    <span><strong>Size:</strong> {g.dims}</span>
+                    <span><strong>Format:</strong> {g.format}</span>
+                    <span><strong>Max:</strong> {g.max}</span>
+                  </div>
+                );
+              })()}
+              {/* Per-locale image override hint for country/locale-specific creatives */}
+              <p className="text-[10px] text-[#909090]">
+                Tip: For country-specific banners, set <strong>Country</strong> below and create a separate banner per country.
+                Same Featured Banner shows on Home, How-it-works, and Book-your-resource — edit once, updates everywhere.
+              </p>
             </div>
           )}
 

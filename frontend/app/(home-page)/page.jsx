@@ -14,6 +14,10 @@ import {
 } from '@/features/homepage/components';
 import CmsBannerStrip from '@/components/cms/CmsBannerStrip';
 import CmsBannerSlider from '@/components/cms/CmsBannerSlider';
+// Featured "Not sure what you need?" banner — same record renders here,
+// on /how-it-works, and on /book-your-resource. Edit once in
+// /admin/cms/banners under "⭐ Featured Banner".
+import HeroSectionV3 from '@/features/booking/components/HeroSectionV3';
 
 export default function Homepage() {
   return (
@@ -37,6 +41,9 @@ export default function Homepage() {
       <WhyQuickSection />
       <BookResourceSection />
       <VibeCoding />
+
+      {/* Featured CMS banner — shared across home / how-it-works / book pages */}
+      <HeroSectionV3 />
 
       {/* CMS slider: home-mid — second slot for ongoing campaigns. */}
       <div className="max-w-7xl mx-auto px-4 my-8">
