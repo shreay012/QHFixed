@@ -141,13 +141,17 @@ export default function BlogPostEditor({ postId = null }) {
 
   // ── Save ──────────────────────────────────────────────────────────────
   async function save(publishNow = false) {
-    if (!form.title?.en) return showError('English title is required');
+    if (!form.title?.en?.trim()) return showError('English Title is required (EN tab)');
     setSaving(true);
+
     const payload = {
       ...form,
-      status: publishNow ? 'published' : form.status,
+      status:      publishNow ? 'published' : form.status,
+      // Empty string fails Zod datetime — send null instead
+      scheduledAt: form.scheduledAt || null,
     };
     if (!payload.slug) payload.slug = slugify(form.title.en || '');
+
     try {
       if (postId) {
         await staffApi.put(`/blog/admin/posts/${postId}`, payload);
@@ -158,7 +162,15 @@ export default function BlogPostEditor({ postId = null }) {
         router.push(`/admin/blog/${res.data.data._id}/edit`);
       }
     } catch (e) {
-      showError(e?.response?.data?.message || 'Save failed');
+      const err = e?.response?.data;
+      // Show Zod field errors if present
+      const fieldErrors = err?.details?.errors?.fieldErrors;
+      if (fieldErrors) {
+        const msgs = Object.entries(fieldErrors).map(([f, v]) => `${f}: ${v[0]}`).join(', ');
+        showError(msgs || err?.message || 'Validation failed');
+      } else {
+        showError(err?.message || 'Save failed — check all required fields');
+      }
     } finally { setSaving(false); }
   }
 
@@ -210,10 +222,15 @@ export default function BlogPostEditor({ postId = null }) {
             </div>
 
             <div className="p-6 space-y-5">
+              {/* Required fields notice */}
+              <p className="text-xs text-[#888]"><span className="text-[#e53e3e] font-bold">*</span> = required field</p>
+
               {/* Title */}
               <div>
                 <label className="block text-sm font-semibold text-[#26472B] mb-2">
-                  Title {locale === 'en' && <span className="text-[#e53e3e]">*</span>}
+                  Title {locale === 'en'
+                    ? <span className="text-[#e53e3e] font-bold">*</span>
+                    : <span className="text-[#aaa] text-xs font-normal">(optional)</span>}
                 </label>
                 <input
                   value={form.title?.[locale] || ''}
@@ -223,19 +240,24 @@ export default function BlogPostEditor({ postId = null }) {
                       setForm(f => ({ ...f, slug: slugify(e.target.value) }));
                     }
                   }}
-                  placeholder={`Post title in ${LOCALES.find(l => l.code === locale)?.label}`}
-                  className="w-full border border-[#D0E8CB] rounded-xl px-4 py-3 text-base font-semibold focus:outline-none focus:border-[#45A735]"
+                  placeholder={locale === 'en' ? 'Enter post title (required)' : `Post title in ${LOCALES.find(l => l.code === locale)?.label} (optional)`}
+                  className={`w-full border rounded-xl px-4 py-3 text-base font-semibold focus:outline-none focus:border-[#45A735] ${locale === 'en' && !form.title?.en ? 'border-[#e53e3e] bg-[#fff8f8]' : 'border-[#D0E8CB]'}`}
                 />
+                {locale === 'en' && !form.title?.en && (
+                  <p className="text-xs text-[#e53e3e] mt-1">Title (English) is required to save</p>
+                )}
               </div>
 
               {/* Excerpt */}
               <div>
-                <label className="block text-sm font-semibold text-[#26472B] mb-2">Excerpt / Summary</label>
+                <label className="block text-sm font-semibold text-[#26472B] mb-2">
+                  Excerpt / Summary <span className="text-[#aaa] text-xs font-normal">(shown in blog cards)</span>
+                </label>
                 <textarea
                   value={form.excerpt?.[locale] || ''}
                   onChange={e => setI18n('excerpt', locale, e.target.value)}
                   rows={3}
-                  placeholder="Brief summary shown in blog cards and meta description…"
+                  placeholder="Brief summary shown in blog listing cards and meta description…"
                   className="w-full border border-[#D0E8CB] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#45A735] resize-none"
                 />
                 <div className="text-right text-xs text-[#aaa] mt-0.5">{(form.excerpt?.[locale] || '').length} / 300</div>
@@ -243,7 +265,9 @@ export default function BlogPostEditor({ postId = null }) {
 
               {/* Body editor */}
               <div>
-                <label className="block text-sm font-semibold text-[#26472B] mb-2">Body Content</label>
+                <label className="block text-sm font-semibold text-[#26472B] mb-2">
+                  Body Content <span className="text-[#aaa] text-xs font-normal">(full article)</span>
+                </label>
                 <TipTapEditor
                   key={locale} // remount on locale change
                   value={form.body?.[locale] || ''}
@@ -358,10 +382,10 @@ export default function BlogPostEditor({ postId = null }) {
         <div className="w-full xl:w-80 flex-shrink-0 space-y-4">
 
           {/* Status & Publish */}
-          <div className="bg-white rounded-xl border border-[#E5F1E2] p-5 space-y-4">
-            <h3 className="font-semibold text-[#26472B]">Publish</h3>
+          <div className="bg-white rounded-xl border border-[#45A735] bg-[#F8FCF7] p-5 space-y-4">
+            <h3 className="font-semibold text-[#26472B]">Publish <span className="text-xs text-[#888] font-normal">(save first, then publish)</span></h3>
             <div>
-              <label className="block text-xs font-medium text-[#444] mb-1">Status</label>
+              <label className="block text-xs font-medium text-[#444] mb-1">Status <span className="text-[#e53e3e] font-bold">*</span></label>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
                       className="w-full border border-[#D0E8CB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#45A735] bg-white">
                 <option value="draft">Draft</option>
@@ -372,10 +396,13 @@ export default function BlogPostEditor({ postId = null }) {
             </div>
             {form.status === 'scheduled' && (
               <div>
-                <label className="block text-xs font-medium text-[#444] mb-1">Scheduled Date & Time</label>
-                <input type="datetime-local" value={form.scheduledAt || ''}
-                       onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
-                       className="w-full border border-[#D0E8CB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#45A735]" />
+                <label className="block text-xs font-medium text-[#444] mb-1">
+                  Scheduled Date & Time <span className="text-[#e53e3e] font-bold">*</span>
+                </label>
+                <input type="datetime-local" value={form.scheduledAt ? form.scheduledAt.slice(0, 16) : ''}
+                       onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value ? new Date(e.target.value).toISOString() : null }))}
+                       className={`w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#45A735] ${!form.scheduledAt ? 'border-[#e53e3e]' : 'border-[#D0E8CB]'}`} />
+                {!form.scheduledAt && <p className="text-xs text-[#e53e3e] mt-1">Required when status is Scheduled</p>}
               </div>
             )}
             <label className="flex items-center gap-2 cursor-pointer">
@@ -387,13 +414,17 @@ export default function BlogPostEditor({ postId = null }) {
 
           {/* Slug */}
           <div className="bg-white rounded-xl border border-[#E5F1E2] p-5">
-            <label className="block text-xs font-semibold text-[#26472B] mb-2">URL Slug</label>
+            <label className="block text-xs font-semibold text-[#26472B] mb-2">
+              URL Slug <span className="text-[#e53e3e] font-bold">*</span>
+              <span className="text-[#aaa] font-normal ml-1">(auto-filled from title)</span>
+            </label>
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#aaa] shrink-0">/blog/</span>
               <input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: slugify(e.target.value) }))}
                      placeholder="auto-generated-from-title"
-                     className="flex-1 border border-[#D0E8CB] rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-[#45A735]" />
+                     className={`flex-1 border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-[#45A735] ${!form.slug ? 'border-[#e53e3e]' : 'border-[#D0E8CB]'}`} />
             </div>
+            {!form.slug && <p className="text-xs text-[#e53e3e] mt-1">Slug is auto-generated — type a title first</p>}
           </div>
 
           {/* Cover images */}
