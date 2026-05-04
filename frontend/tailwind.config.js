@@ -57,7 +57,7 @@ const config = {
       },
     },
   },
-  plugins: [],
+  plugins: [require('@tailwindcss/typography')],
   // Note: We'll handle MUI conflicts in globals.css instead of disabling preflight
 };
 
