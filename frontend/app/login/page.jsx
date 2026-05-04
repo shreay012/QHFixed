@@ -16,6 +16,28 @@ import {
 } from "@/lib/redux/slices/userProfileSlice/userProfileSlice";
 import Image from "next/image";
 
+// Supported countries for the login phone input. Order: served markets
+// first, popular destinations after. Min/max digit length is the national
+// number length (excluding country code) so we can validate per country
+// without yanking in libphonenumber.
+const COUNTRY_CODES = [
+  { code: "IN", name: "India",          dial: "+91",  flag: "🇮🇳", min: 10, max: 10 },
+  { code: "AE", name: "UAE",            dial: "+971", flag: "🇦🇪", min: 8,  max: 9  },
+  { code: "US", name: "United States",  dial: "+1",   flag: "🇺🇸", min: 10, max: 10 },
+  { code: "GB", name: "United Kingdom", dial: "+44",  flag: "🇬🇧", min: 10, max: 10 },
+  { code: "DE", name: "Germany",        dial: "+49",  flag: "🇩🇪", min: 10, max: 11 },
+  { code: "AU", name: "Australia",      dial: "+61",  flag: "🇦🇺", min: 9,  max: 9  },
+  { code: "SA", name: "Saudi Arabia",   dial: "+966", flag: "🇸🇦", min: 9,  max: 9  },
+  { code: "SG", name: "Singapore",      dial: "+65",  flag: "🇸🇬", min: 8,  max: 8  },
+  { code: "CA", name: "Canada",         dial: "+1",   flag: "🇨🇦", min: 10, max: 10 },
+];
+
+function readCountryCookie() {
+  if (typeof document === "undefined") return "IN";
+  const m = document.cookie.match(/(?:^|;\s*)qh_country=([A-Z]{2})/);
+  return m ? m[1] : "IN";
+}
+
 const LoginPage = () => {
   const router = useRouter();
   const dispatch = useDispatch();
@@ -26,6 +48,18 @@ const LoginPage = () => {
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [mobileNumber, setMobileNumber] = useState("");
+  // Default to the user's detected country (qh_country cookie set by edge
+  // proxy). Falls back to IN. The selected country drives min/max digit
+  // length and the dial-code prefix sent to the backend in E.164 format.
+  const [countryCode, setCountryCode] = useState("IN");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const selectedCountry = COUNTRY_CODES.find((c) => c.code === countryCode) || COUNTRY_CODES[0];
+  // Full E.164 number sent to backend: dial + national digits (no spaces).
+  const e164Mobile = `${selectedCountry.dial}${mobileNumber}`;
+  // Per-country length validity — covers IN/UAE/US/etc. without libphonenumber.
+  const isMobileLenValid =
+    mobileNumber.length >= selectedCountry.min &&
+    mobileNumber.length <= selectedCountry.max;
   const [otpValues, setOtpValues] = useState(["", "", "", ""]);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [showResendTimer, setShowResendTimer] = useState(false);
@@ -66,6 +100,13 @@ const LoginPage = () => {
   // Mount effect - runs once on client
   useEffect(() => {
     setIsMounted(true);
+    // Pre-select the country dropdown based on the qh_country cookie
+    // (set by the edge proxy from CF-IPCountry / Accept-Language). Only
+    // override if the detected country is one we explicitly support.
+    const cookieCountry = readCountryCookie();
+    if (COUNTRY_CODES.some((c) => c.code === cookieCountry)) {
+      setCountryCode(cookieCountry);
+    }
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -172,7 +213,9 @@ const LoginPage = () => {
   // 3) replace your handleMobileChange with this
   // update handleMobileChange (reset OTP auto-login guard when number changes)
   const handleMobileChange = (value) => {
-    const digitsOnly = value.replace(/\D/g, "").slice(0, 10);
+    // Slice to selected country's max length so admins typing more than
+    // expected get a hard cap instead of a backend rejection later.
+    const digitsOnly = value.replace(/\D/g, "").slice(0, selectedCountry.max);
     setMobileNumber(digitsOnly);
 
     if (isOtpStep) {
@@ -185,19 +228,27 @@ const LoginPage = () => {
 
     autoLoginOtpRef.current = "";
 
-    if (digitsOnly.length < 10) {
+    const lenOk =
+      digitsOnly.length >= selectedCountry.min &&
+      digitsOnly.length <= selectedCountry.max;
+
+    if (!lenOk) {
       autoSentNumberRef.current = "";
       return;
     }
 
+    // Auto-fire OTP send when the user has entered a complete national
+    // number for the selected country. We compare on the full E.164 form
+    // so changing the country re-arms the auto-send without re-typing.
+    const fullE164 = `${selectedCountry.dial}${digitsOnly}`;
     if (
-      digitsOnly.length === 10 &&
+      lenOk &&
       !isLoading &&
       !isOtpStep &&
-      autoSentNumberRef.current !== digitsOnly
+      autoSentNumberRef.current !== fullE164
     ) {
-      autoSentNumberRef.current = digitsOnly;
-      handleSendOtp(digitsOnly);
+      autoSentNumberRef.current = fullE164;
+      handleSendOtp(fullE164);
     }
   };
 
@@ -225,7 +276,7 @@ const LoginPage = () => {
       if (
         isOtpStep &&
         !isLoading &&
-        mobileNumber.length === 10 &&
+        isMobileLenValid &&
         autoLoginOtpRef.current !== otp
       ) {
         autoLoginOtpRef.current = otp;
@@ -244,8 +295,25 @@ const LoginPage = () => {
     }
   };
 
+  // Accept either a full E.164 ("+919876543210") or a national number
+  // ("9876543210") — caller passes whichever they have. We always send
+  // the E.164 form to the backend so the validator's phoneRegex passes
+  // and Twilio can route internationally.
+  const toE164ForApi = (input) => {
+    const s = String(input || "");
+    if (s.startsWith("+")) return s;
+    return `${selectedCountry.dial}${s.replace(/\D/g, "")}`;
+  };
+
   const handleSendOtp = async (number) => {
-    if (!number || number.length !== 10) {
+    const e164 = toE164ForApi(number);
+    // Validate against the selected country's national-number length
+    // (slice off the dial code first).
+    const national = e164.replace(selectedCountry.dial, "");
+    if (
+      national.length < selectedCountry.min ||
+      national.length > selectedCountry.max
+    ) {
       setErrorMessage(t("errorMobileInvalid"));
       return;
     }
@@ -254,7 +322,7 @@ const LoginPage = () => {
       setErrorMessage(null);
       dispatch(clearError());
 
-      const result = await dispatch(sendOtp(number)).unwrap();
+      const result = await dispatch(sendOtp(e164)).unwrap();
 
       setSuccessMessage(t("successOtpSent"));
 
@@ -271,7 +339,12 @@ const LoginPage = () => {
   };
 
   const handleResendOtp = async (number) => {
-    if (!number || number.length !== 10) {
+    const e164 = toE164ForApi(number);
+    const national = e164.replace(selectedCountry.dial, "");
+    if (
+      national.length < selectedCountry.min ||
+      national.length > selectedCountry.max
+    ) {
       setErrorMessage(t("errorMobileInvalid"));
       return;
     }
@@ -283,7 +356,7 @@ const LoginPage = () => {
       autoLoginOtpRef.current = "";
 
       setResendSeconds(120);
-      await dispatch(sendOtp(number)).unwrap();
+      await dispatch(sendOtp(e164)).unwrap();
 
       setSuccessMessage(t("successOtpSent"));
       setTimeout(() => {
@@ -310,8 +383,10 @@ const LoginPage = () => {
       dispatch(clearError());
 
       const fcmToken = "";
+      // Send E.164 (+countrycode + national) so backend Twilio + validator
+      // accept the same number used during sendOtp.
       const result = await dispatch(
-        verifyOtp({ mobileNumber, otp, fcmToken }),
+        verifyOtp({ mobileNumber: e164Mobile, otp, fcmToken }),
       ).unwrap();
 
       setSuccessMessage(t("successOtpVerified"));
@@ -399,7 +474,11 @@ const LoginPage = () => {
         id: userId,
         name: fullName,
         email: email,
-        mobile: userData.mobile || mobileNumber,
+        // Persist the full E.164 number so country-aware features
+        // (international SMS, currency detection from country code) keep
+        // working long after login. userData.mobile already arrives in
+        // E.164 from the verifyOtp response.
+        mobile: userData.mobile || e164Mobile,
         role: userData.role || "user",
       };
 
@@ -948,8 +1027,70 @@ const LoginPage = () => {
                           backgroundColor: "#FFFFFF",
                           borderRadius: "12px",
                           border: `1px solid ${isMobileFocused ? "#45A735" : "#E5E5E5"}`,
+                          position: "relative",
                         }}
                       >
+                        {/* Country code picker — opens a dropdown of supported
+                            countries with flag + dial code. Selected dial is
+                            sent to backend as part of E.164 number. */}
+                        <button
+                          type="button"
+                          onClick={() => setShowCountryPicker((v) => !v)}
+                          className="flex items-center gap-1.5 border-r border-[#E5E5E5]"
+                          style={{
+                            paddingLeft: isMobile ? "12px" : "16px",
+                            paddingRight: isMobile ? "10px" : "12px",
+                            fontSize: `${responsive.fontSize}px`,
+                            color: "#484848",
+                            fontFamily: "'OpenSauceOne', sans-serif",
+                            cursor: "pointer",
+                            background: "transparent",
+                            minWidth: isMobile ? "92px" : "104px",
+                          }}
+                          aria-haspopup="listbox"
+                          aria-expanded={showCountryPicker}
+                        >
+                          <span style={{ fontSize: "16px" }}>{selectedCountry.flag}</span>
+                          <span style={{ fontWeight: 500 }}>{selectedCountry.dial}</span>
+                          <svg width={10} height={10} viewBox="0 0 24 24" fill="none" style={{ marginLeft: "2px", color: "#909090" }}>
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+
+                        {showCountryPicker && (
+                          <div
+                            role="listbox"
+                            className="absolute top-full left-0 mt-1 bg-white border border-[#E5E5E5] rounded-xl shadow-lg z-30 overflow-hidden"
+                            style={{ minWidth: "240px", maxHeight: "280px", overflowY: "auto" }}
+                          >
+                            {COUNTRY_CODES.map((c) => (
+                              <button
+                                key={c.code}
+                                type="button"
+                                role="option"
+                                aria-selected={c.code === countryCode}
+                                onClick={() => {
+                                  setCountryCode(c.code);
+                                  setShowCountryPicker(false);
+                                  // Reset auto-send tracker so changing
+                                  // country re-arms the OTP send.
+                                  autoSentNumberRef.current = "";
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[#F2F9F1] transition-colors"
+                                style={{
+                                  fontSize: "14px",
+                                  color: c.code === countryCode ? "#26472B" : "#484848",
+                                  background: c.code === countryCode ? "#F2F9F1" : "transparent",
+                                }}
+                              >
+                                <span style={{ fontSize: "18px" }}>{c.flag}</span>
+                                <span style={{ flex: 1, fontWeight: c.code === countryCode ? 600 : 400 }}>{c.name}</span>
+                                <span style={{ color: "#909090" }}>{c.dial}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
                         <div className="flex-1 flex items-center">
                           <input
                             type="tel"
@@ -963,12 +1104,12 @@ const LoginPage = () => {
                               fontSize: `${responsive.fontSize}px`,
                               color: "#484848",
                               fontFamily: "'OpenSauceOne', sans-serif",
-                              paddingLeft: isMobile ? "16px" : "20px",
+                              paddingLeft: isMobile ? "12px" : "16px",
                               paddingRight: "12px",
                               paddingTop: "12px",
                               paddingBottom: "12px",
                             }}
-                            maxLength={10}
+                            maxLength={selectedCountry.max}
                           />
                         </div>
 
@@ -982,8 +1123,7 @@ const LoginPage = () => {
                         >
                           <button
                             onClick={() =>
-                              mobileNumber.length === 10 &&
-                              handleSendOtp(mobileNumber)
+                              isMobileLenValid && handleSendOtp(e164Mobile)
                             }
                             disabled={isLoading || isOtpStep}
                             className="px-4 py-2 transition-colors"
