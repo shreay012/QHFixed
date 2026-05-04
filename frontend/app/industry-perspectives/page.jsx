@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import axiosInstance from '@/lib/axios/axiosInstance';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -21,10 +20,16 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function pick(field, lang) {
+  if (!field) return '';
+  if (typeof field === 'string') return field;
+  return field[lang] || field.en || field[Object.keys(field)[0]] || '';
+}
+
 /* ── Blog card ─────────────────────────────────────────────────────────── */
 function PostCard({ post, lang, size = 'sm' }) {
-  const title   = post.title?.[lang]   || post.title?.en   || 'Untitled';
-  const excerpt = post.excerpt?.[lang] || post.excerpt?.en || '';
+  const title   = pick(post.title, lang)   || 'Untitled';
+  const excerpt = pick(post.excerpt, lang) || '';
   const cover   = post.coverImage      || '/images/blog-placeholder.png';
   const cat     = post.categoriesData?.[0];
   const slug    = post.slug;
@@ -39,7 +44,7 @@ function PostCard({ post, lang, size = 'sm' }) {
           <div className="absolute inset-0 flex flex-col justify-end p-8">
             {cat && (
               <span className="inline-block self-start bg-[#45A735] text-white text-xs font-bold px-3 py-1 rounded-full mb-3 uppercase tracking-wide">
-                {cat.name?.[lang] || cat.name?.en}
+                {pick(cat.name, lang)}
               </span>
             )}
             <h2 className="text-white text-2xl sm:text-3xl font-bold leading-tight mb-3 line-clamp-3 group-hover:text-[#78EB54] transition-colors">
@@ -64,7 +69,7 @@ function PostCard({ post, lang, size = 'sm' }) {
         <Image src={cover} alt={title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="(max-width:640px) 100vw,(max-width:1024px) 50vw,33vw" />
         {cat && (
           <span className="absolute top-3 left-3 bg-white/95 text-[#26472B] text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide shadow-sm">
-            {cat.name?.[lang] || cat.name?.en}
+            {pick(cat.name, lang)}
           </span>
         )}
       </div>
@@ -126,15 +131,19 @@ function IndustryPerspectivesInner() {
       if (activeCat)   p.set('category', activeCat);
       if (activeTag)   p.set('tag', activeTag);
       if (debouncedQ)  p.set('search', debouncedQ);
-      const res = await axiosInstance.get(`/blog/posts?${p}`);
-      setPosts(res.data.data || []);
-      setMeta(res.data.meta || null);
+      const res  = await fetch(`${BASE}/blog/posts?${p}`);
+      const json = await res.json();
+      setPosts(json.data || []);
+      setMeta(json.meta || null);
     } catch { setPosts([]); }
     finally { setLoading(false); }
   }, [country, lang, page, activeCat, activeTag, debouncedQ]);
 
   useEffect(() => {
-    axiosInstance.get(`/blog/categories?lang=${lang}`).then(r => setCats(r.data.data || [])).catch(() => {});
+    fetch(`${BASE}/blog/categories?lang=${lang}`)
+      .then(r => r.json())
+      .then(j => setCats(j.data || []))
+      .catch(() => {});
   }, [lang]);
 
   useEffect(() => { load(); }, [load]);
@@ -184,7 +193,7 @@ function IndustryPerspectivesInner() {
                   onClick={() => selectCat(c.slug)}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${activeCat === c.slug ? 'bg-[#45A735] text-white shadow-sm' : 'bg-[#f0f7ee] text-[#3a5a3a] hover:bg-[#e0eddc]'}`}
                 >
-                  {c.name?.[lang] || c.name?.en}
+                  {pick(c.name, lang)}
                 </button>
               ))}
             </div>
