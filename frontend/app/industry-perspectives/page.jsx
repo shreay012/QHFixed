@@ -110,6 +110,7 @@ function IndustryPerspectivesInner() {
   const [cats, setCats]             = useState([]);
   const [meta, setMeta]             = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [activeCat, setActiveCat]   = useState(sp?.get('category') || '');
   const [activeTag, setActiveTag]   = useState(sp?.get('tag') || '');
   const [search, setSearch]         = useState('');
@@ -126,16 +127,18 @@ function IndustryPerspectivesInner() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setFetchError(false);
     try {
       const p = new URLSearchParams({ country, lang, page, limit: 9 });
       if (activeCat)   p.set('category', activeCat);
       if (activeTag)   p.set('tag', activeTag);
       if (debouncedQ)  p.set('search', debouncedQ);
       const res  = await fetch(`${BASE}/blog/posts?${p}`);
+      if (!res.ok) { setFetchError(true); setPosts([]); return; }
       const json = await res.json();
       setPosts(json.data || []);
       setMeta(json.meta || null);
-    } catch { setPosts([]); }
+    } catch { setFetchError(true); setPosts([]); }
     finally { setLoading(false); }
   }, [country, lang, page, activeCat, activeTag, debouncedQ]);
 
@@ -232,13 +235,24 @@ function IndustryPerspectivesInner() {
           </>
         ) : posts.length === 0 ? (
           <div className="py-32 text-center">
-            <div className="text-6xl mb-5">✍️</div>
-            <h2 className="text-xl font-bold text-[#1a2e1a] mb-2">No articles found</h2>
-            <p className="text-[#6b7280] text-sm">Try a different search term or category</p>
-            {(activeCat || activeTag || debouncedQ) && (
-              <button onClick={() => { selectCat(''); setSearch(''); }} className="mt-5 text-[#45A735] text-sm hover:underline">
-                Clear filters →
-              </button>
+            {fetchError ? (
+              <>
+                <div className="text-6xl mb-5">⚠️</div>
+                <h2 className="text-xl font-bold text-[#1a2e1a] mb-2">Could not load articles</h2>
+                <p className="text-[#6b7280] text-sm mb-4">Backend is not reachable. Check Render deployment.</p>
+                <button onClick={() => load()} className="text-[#45A735] text-sm hover:underline">Retry →</button>
+              </>
+            ) : (
+              <>
+                <div className="text-6xl mb-5">✍️</div>
+                <h2 className="text-xl font-bold text-[#1a2e1a] mb-2">No articles found</h2>
+                <p className="text-[#6b7280] text-sm">No published articles yet. Go to Admin → Blog → Publish a post.</p>
+                {(activeCat || activeTag || debouncedQ) && (
+                  <button onClick={() => { selectCat(''); setSearch(''); }} className="mt-5 text-[#45A735] text-sm hover:underline">
+                    Clear filters →
+                  </button>
+                )}
+              </>
             )}
           </div>
         ) : (
