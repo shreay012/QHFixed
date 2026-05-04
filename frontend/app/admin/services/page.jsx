@@ -134,8 +134,13 @@ export default function AdminServicesPage() {
           <p className="font-open-sauce-semibold text-[#26472B]">
             {typeof s.name === 'object' ? s.name.en : s.name}
           </p>
-          {typeof s.description === 'string' && s.description && (
-            <p className="text-xs text-[#909090] truncate max-w-xs mt-0.5">{s.description}</p>
+          {s.slug ? (
+            <a href={`/service-details/${s.slug}`} target="_blank" rel="noopener"
+               className="text-xs text-[#45A735] font-mono hover:underline mt-0.5 inline-block">
+              /service-details/{s.slug}
+            </a>
+          ) : (
+            <span className="text-xs text-[#e53e3e] mt-0.5 inline-block">No slug — edit to set URL</span>
           )}
         </div>
       ),

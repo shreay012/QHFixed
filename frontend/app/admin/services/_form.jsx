@@ -72,7 +72,17 @@ const emptyTech    = () => emptyLangMap();
 const emptyFeature      = () => ({ icon: '', label: emptyLangMap() });
 const emptyProcessStep  = () => ({ title: emptyLangMap(), description: emptyLangMap() });
 
+function toSlug(str) {
+  return str.toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 80);
+}
+
 const emptyForm = () => ({
+  slug:         '',
+  _slugEdited:  false,
   name:         emptyLangMap(),
   description:  emptyLangMap(),
   // Tagline: short one-liner shown on the customer-facing service card grid.
@@ -929,6 +939,8 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
     const promises = (initialData.promises || []).map((p) => langMapFrom(p));
 
     setForm({
+      slug:         initialData.slug || '',
+      _slugEdited:  !!(initialData.slug),
       name:         nameMap,
       description:  descMap,
       tagline:      taglineMap,
@@ -953,6 +965,9 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
 
   const save = async () => {
     if (!form.name.en.trim()) { showError('English name is required'); setTab(0); return; }
+    const resolvedSlug = form.slug.trim() || toSlug(form.name.en);
+    if (resolvedSlug.length < 2) { showError('Slug must be at least 2 characters'); setTab(0); return; }
+    setForm(f => ({ ...f, slug: resolvedSlug }));
     setBusy(true);
     try {
       // Build i18n name object — only include locales that have a value
@@ -1028,6 +1043,7 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
         .map((p) => sparseI18n(p));
 
       const body = {
+        slug:         resolvedSlug,
         name:         nameI18n,
         category:     form.category || '',
         description:  descI18n,
@@ -1158,10 +1174,43 @@ export default function ServiceFormPage({ serviceId = null, initialData = null }
                 <Label>Service Name (English) <span className="text-red-500 normal-case font-normal">— required</span></Label>
                 <Input
                   value={form.name.en}
-                  onChange={(v) => setLang('name', 'en', v)}
+                  onChange={(v) => setForm(f => ({
+                    ...f,
+                    name:        { ...f.name, en: v },
+                    slug:        f._slugEdited ? f.slug : toSlug(v),
+                  }))}
                   placeholder="e.g. AI Engineer"
                 />
                 <p className="text-xs text-[#909090] mt-1">Translations for other languages are in the Translations tab.</p>
+              </div>
+
+              {/* ── Slug / URL ── */}
+              <div>
+                <Label>URL Slug <span className="text-red-500 normal-case font-normal">— required</span></Label>
+                <div className="flex items-center border border-[#E5F1E2] rounded-xl overflow-hidden focus-within:border-[#45A735] focus-within:ring-1 focus-within:ring-[#45A73520] transition-colors">
+                  <span className="px-3 py-2.5 text-xs text-[#888] bg-[#F8FCF7] border-r border-[#E5F1E2] whitespace-nowrap select-none">
+                    /service-details/
+                  </span>
+                  <input
+                    type="text"
+                    value={form.slug}
+                    onChange={(e) => {
+                      const raw = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 80);
+                      setForm(f => ({ ...f, slug: raw, _slugEdited: true }));
+                    }}
+                    placeholder="ai-engineer"
+                    className="flex-1 px-3 py-2.5 text-sm outline-none bg-white font-mono"
+                  />
+                </div>
+                <p className="text-xs text-[#909090] mt-1">
+                  Auto-filled from the name. Edit to customise. Used as the public URL —&nbsp;
+                  <span className="font-medium text-[#45A735]">must be unique</span>.
+                </p>
+                {form.slug && (
+                  <p className="text-xs text-[#45A735] mt-1 font-mono">
+                    Preview: /service-details/{form.slug}
+                  </p>
+                )}
               </div>
 
               <div>
