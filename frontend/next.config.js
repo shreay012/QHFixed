@@ -56,6 +56,14 @@ const nextConfig = {
   //
   //   /ae/service-details/123  →  /service-details/123  (cookie=AE already set)
   //   /ae                      →  /
+  async redirects() {
+    return [
+      { source: '/blog', destination: '/industry-perspectives', permanent: true },
+      { source: '/blog/category/:slug*', destination: '/industry-perspectives/category/:slug*', permanent: true },
+      { source: '/blog/:slug*', destination: '/industry-perspectives/:slug*', permanent: true },
+    ];
+  },
+
   async rewrites() {
     return [
       // Root: /ae → /

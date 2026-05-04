@@ -36,7 +36,7 @@ function ShareButtons({ title, url }) {
   );
 }
 
-export default function BlogDetail({ post, lang = 'en' }) {
+export default function BlogDetail({ post, lang = 'en', basePath = '/industry-perspectives' }) {
   const title    = post.title?.[lang]   || post.title?.en   || '';
   const body     = post.body?.[lang]    || post.body?.en    || '';
   const excerpt  = post.excerpt?.[lang] || post.excerpt?.en || '';
@@ -47,26 +47,11 @@ export default function BlogDetail({ post, lang = 'en' }) {
 
   return (
     <article className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-[#888] mb-6">
-        <Link href="/" className="hover:text-[#45A735]">Home</Link>
-        <span>/</span>
-        <Link href="/blog" className="hover:text-[#45A735]">Blog</Link>
-        {cats[0] && (
-          <>
-            <span>/</span>
-            <Link href={`/blog/category/${cats[0].slug}`} className="hover:text-[#45A735]">
-              {cats[0].name?.[lang] || cats[0].name?.en}
-            </Link>
-          </>
-        )}
-      </nav>
-
       {/* Category badges */}
       {cats.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
           {cats.map(c => (
-            <Link key={c._id} href={`/blog/category/${c.slug}`}
+            <Link key={c._id} href={`${basePath}/category/${c.slug}`}
                   className="inline-block bg-[#F2F9F1] text-[#45A735] text-xs font-semibold px-3 py-1 rounded-full border border-[#C5E0BF] hover:bg-[#45A735] hover:text-white transition-colors">
               {c.name?.[lang] || c.name?.en}
             </Link>
@@ -116,7 +101,7 @@ export default function BlogDetail({ post, lang = 'en' }) {
         <div className="flex flex-wrap gap-2 mt-10 pt-6 border-t border-[#E5F1E2]">
           <span className="text-sm text-[#666] font-medium mr-1">Tags:</span>
           {post.tags.map(tag => (
-            <Link key={tag} href={`/blog?tag=${encodeURIComponent(tag)}`}
+            <Link key={tag} href={`${basePath}?tag=${encodeURIComponent(tag)}`}
                   className="text-xs px-3 py-1 rounded-full bg-[#F2F9F1] text-[#45A735] border border-[#C5E0BF] hover:bg-[#45A735] hover:text-white transition-colors">
               #{tag}
             </Link>

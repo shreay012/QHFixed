@@ -12,7 +12,7 @@ function fmtDate(iso) {
   } catch { return ''; }
 }
 
-export default function BlogCard({ post, lang = 'en', variant = 'default' }) {
+export default function BlogCard({ post, lang = 'en', variant = 'default', basePath = '/industry-perspectives' }) {
   const title   = post.title?.[lang]   || post.title?.en   || 'Untitled';
   const excerpt = post.excerpt?.[lang] || post.excerpt?.en || '';
   const cover   = post.coverImage || '/images/blog-placeholder.png';
@@ -22,7 +22,7 @@ export default function BlogCard({ post, lang = 'en', variant = 'default' }) {
 
   if (variant === 'featured') {
     return (
-      <Link href={`/blog/${slug}`} className="group block relative rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow bg-[#26472B]">
+      <Link href={`${basePath}/${slug}`} className="group block relative rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow bg-[#26472B]">
         <div className="relative aspect-[16/9]">
           <Image src={cover} alt={title} fill className="object-cover opacity-70 group-hover:scale-105 transition-transform duration-500" sizes="(max-width:768px) 100vw,60vw" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0d2211] via-[#0d221188] to-transparent" />
@@ -46,7 +46,7 @@ export default function BlogCard({ post, lang = 'en', variant = 'default' }) {
   }
 
   return (
-    <Link href={`/blog/${slug}`} className="group flex flex-col rounded-xl border border-[#E5F1E2] bg-white hover:border-[#45A735] hover:shadow-md transition-all overflow-hidden">
+    <Link href={`${basePath}/${slug}`} className="group flex flex-col rounded-xl border border-[#E5F1E2] bg-white hover:border-[#45A735] hover:shadow-md transition-all overflow-hidden">
       {/* Cover image */}
       <div className="relative aspect-[16/9] bg-[#F2F9F1] overflow-hidden">
         <Image src={cover} alt={title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="(max-width:640px) 100vw,(max-width:1024px) 50vw,33vw" />

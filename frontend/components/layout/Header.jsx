@@ -161,6 +161,7 @@ const Header = () => {
     { label: t("home"), path: "/" },
     { label: t("bookExperts"), path: "/book-your-resource" },
     { label: t("howItWorks"), path: "/how-it-works" },
+    { label: t("industryPerspectives"), path: "/industry-perspectives" },
     { label: t("contactUs"), path: "/contact-us" },
   ];
 
