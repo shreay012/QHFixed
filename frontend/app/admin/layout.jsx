@@ -147,6 +147,24 @@ const links = [
   // ── CONTENT ─────────────────────────────────────────────────────────────
   { type: 'section', label: 'Content' },
   {
+    href: '/admin/blog',
+    label: 'Blog Posts',
+    icon: (
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/admin/blog/categories',
+    label: 'Blog Categories',
+    icon: (
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+      </svg>
+    ),
+  },
+  {
     href: '/admin/cms',
     label: 'CMS Keys',
     icon: (

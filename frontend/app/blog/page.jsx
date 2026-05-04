@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -18,7 +18,7 @@ function readLang() {
   return localStorage.getItem('qh_lang') || 'en';
 }
 
-export default function BlogListingPage() {
+function BlogListingInner() {
   const sp = useSearchParams();
   const [posts, setPosts]       = useState([]);
   const [cats, setCats]         = useState([]);
@@ -214,5 +214,13 @@ export default function BlogListingPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+export default function BlogListingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F8FCF7] flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-[#45A735] border-t-transparent rounded-full" /></div>}>
+      <BlogListingInner />
+    </Suspense>
   );
 }
