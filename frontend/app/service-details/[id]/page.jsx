@@ -32,7 +32,12 @@ export default function ServiceDetailsPage() {
   useEffect(() => {
     if (!id) return;
     // Pre-seed Redux from sessionStorage on first load only so the page can
-    // render immediately without waiting for the network round-trip.
+    // render immediately without waiting for the network round-trip. The
+    // route param can be either the ObjectId or the slug (backend resolves
+    // both), so accept a match on either side.
+    const matchesUrl = (svc) =>
+      svc && (String(svc._id) === String(id) || String(svc.slug) === String(id));
+
     if (!seededRef.current) {
       seededRef.current = true;
       const cached = typeof window !== "undefined"
@@ -41,7 +46,7 @@ export default function ServiceDetailsPage() {
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          if (String(parsed?._id) === String(id)) {
+          if (matchesUrl(parsed)) {
             dispatch(setSelectedService(parsed));
           }
         } catch {}
@@ -52,9 +57,15 @@ export default function ServiceDetailsPage() {
     dispatch(fetchServiceById(id));
   }, [id, locale, dispatch]);
 
-  // Only use selectedService if it matches the current page id — prevents
-  // briefly showing a previous service's content while the new one loads.
-  const service = String(selectedService?._id) === String(id) ? selectedService : null;
+  // Only use selectedService if it matches the current page id (or slug) —
+  // prevents briefly showing a previous service's content while the new one
+  // loads. Slug-based URLs (homepage links) used to fail this check because
+  // selectedService._id is an ObjectId and id is a slug — accept either.
+  const service =
+    selectedService &&
+    (String(selectedService._id) === String(id) || String(selectedService.slug) === String(id))
+      ? selectedService
+      : null;
 
   // Show spinner while we have no data and no error.  Once `service` is
   // populated (from either sessionStorage seed or the API fetch) the spinner
