@@ -1,19 +1,14 @@
 import BlogDetail from '@/features/blog/components/BlogDetail';
 import BlogCard from '@/features/blog/components/BlogCard';
 import Link from 'next/link';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { blogFetchPost, blogFetchPosts } from '@/lib/blog/fetchBlog';
 
 async function getPost(slug, lang = 'en', country = 'IN') {
   try {
-    const res = await fetch(`${API}/blog/posts/${slug}?lang=${lang}&country=${country}`, { cache: 'no-store' });
-    if (!res.ok) {
-      console.error(`[blog] getPost ${slug} → HTTP ${res.status}`);
-      return null;
-    }
-    return (await res.json()).data;
+    const json = await blogFetchPost(slug, lang, country);
+    return json.data || null;
   } catch (e) {
-    console.error(`[blog] getPost ${slug} fetch error:`, e?.message);
+    console.error(`[blog] getPost ${slug}:`, e?.message);
     return null;
   }
 }
@@ -21,8 +16,8 @@ async function getPost(slug, lang = 'en', country = 'IN') {
 async function getRelated(cats = [], excludeSlug = '', lang = 'en', country = 'IN') {
   if (!cats.length) return [];
   try {
-    const res = await fetch(`${API}/blog/posts?category=${cats[0]}&lang=${lang}&country=${country}&limit=4`, { cache: 'no-store' });
-    return ((await res.json()).data || []).filter(p => p.slug !== excludeSlug).slice(0, 3);
+    const json = await blogFetchPosts({ category: cats[0], lang, country, limit: 4 });
+    return (json.data || []).filter(p => p.slug !== excludeSlug).slice(0, 3);
   } catch { return []; }
 }
 

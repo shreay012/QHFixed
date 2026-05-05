@@ -1,24 +1,18 @@
 import BlogCard from '@/features/blog/components/BlogCard';
 import Link from 'next/link';
+import { blogFetchCategories, blogFetchPosts } from '@/lib/blog/fetchBlog';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-async function getCategory(slug, lang = 'en', country = 'IN') {
+async function getCategory(slug, lang = 'en') {
   try {
-    const res = await fetch(`${API}/blog/categories?lang=${lang}&country=${country}`, { next: { revalidate: 600 } });
-    const cats = (await res.json()).data || [];
-    return cats.find(c => c.slug === slug) || null;
+    const json = await blogFetchCategories(lang);
+    return (json.data || []).find(c => c.slug === slug) || null;
   } catch { return null; }
 }
 
 async function getPosts(categorySlug, lang = 'en', country = 'IN', page = 1) {
   try {
-    const res = await fetch(
-      `${API}/blog/posts?category=${categorySlug}&lang=${lang}&country=${country}&page=${page}&limit=12`,
-      { next: { revalidate: 300 } }
-    );
-    const json = await res.json();
-    return { posts: json.data || [], total: json.total || 0, pages: json.pages || 1 };
+    const json = await blogFetchPosts({ category: categorySlug, lang, country, page, limit: 12 });
+    return { posts: json.data || [], total: json.meta?.total || 0, pages: json.meta?.totalPages || 1 };
   } catch { return { posts: [], total: 0, pages: 1 }; }
 }
 

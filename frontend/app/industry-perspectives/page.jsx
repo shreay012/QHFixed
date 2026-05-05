@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const BASE = '';
 
 function readCookie(n) {
   if (typeof document === 'undefined') return '';
@@ -133,7 +133,7 @@ function IndustryPerspectivesInner() {
       if (activeCat)   p.set('category', activeCat);
       if (activeTag)   p.set('tag', activeTag);
       if (debouncedQ)  p.set('search', debouncedQ);
-      const res  = await fetch(`${BASE}/blog/posts?${p}`);
+      const res  = await fetch(`${BASE}/api/blog/posts?${p}`);
       if (!res.ok) {
         console.error(`[blog] list fetch HTTP ${res.status}`);
         setFetchError(res.status);
@@ -152,7 +152,7 @@ function IndustryPerspectivesInner() {
   }, [country, lang, page, activeCat, activeTag, debouncedQ]);
 
   useEffect(() => {
-    fetch(`${BASE}/blog/categories?lang=${lang}`)
+    fetch(`${BASE}/api/blog/categories?lang=${lang}`)
       .then(r => r.json())
       .then(j => setCats(j.data || []))
       .catch(() => {});
