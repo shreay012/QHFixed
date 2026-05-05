@@ -41,6 +41,24 @@ import {
 } from "@/lib/redux/slices/bookingSlice/bookingSlice";
 import { useTranslations } from "next-intl";
 
+const COUNTRY_CODES = [
+  { code: "IN", name: "India",          dial: "+91",  flag: "🇮🇳", min: 10, max: 10 },
+  { code: "AE", name: "UAE",            dial: "+971", flag: "🇦🇪", min: 8,  max: 9  },
+  { code: "US", name: "United States",  dial: "+1",   flag: "🇺🇸", min: 10, max: 10 },
+  { code: "GB", name: "United Kingdom", dial: "+44",  flag: "🇬🇧", min: 10, max: 10 },
+  { code: "DE", name: "Germany",        dial: "+49",  flag: "🇩🇪", min: 10, max: 11 },
+  { code: "AU", name: "Australia",      dial: "+61",  flag: "🇦🇺", min: 9,  max: 9  },
+  { code: "SA", name: "Saudi Arabia",   dial: "+966", flag: "🇸🇦", min: 9,  max: 9  },
+  { code: "SG", name: "Singapore",      dial: "+65",  flag: "🇸🇬", min: 8,  max: 8  },
+  { code: "CA", name: "Canada",         dial: "+1",   flag: "🇨🇦", min: 10, max: 10 },
+];
+
+function readCountryCookie() {
+  if (typeof document === "undefined") return "IN";
+  const m = document.cookie.match(/(?:^|;\s*)qh_country=([A-Z]{2})/);
+  return m ? m[1] : "IN";
+}
+
 const DetailsStep = () => {
   const {
     setNavigationCallback,
@@ -67,6 +85,14 @@ const DetailsStep = () => {
   const { createdJobId } = useSelector((state) => state.booking);
 
   const [mobileNumber, setMobileNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("IN");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const selectedCountry =
+    COUNTRY_CODES.find((c) => c.code === countryCode) || COUNTRY_CODES[0];
+  const e164Mobile = `${selectedCountry.dial}${mobileNumber}`;
+  const isMobileLenValid =
+    mobileNumber.length >= selectedCountry.min &&
+    mobileNumber.length <= selectedCountry.max;
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState(["", "", "", ""]);
   const [otpVerified, setOtpVerified] = useState(false);
@@ -90,6 +116,13 @@ const DetailsStep = () => {
   const otpVerifiedRef = useRef(false);
   const proceedFuncRef = useRef(null);
   const hasRestoredRef = useRef(false);
+
+  useEffect(() => {
+    const cc = readCountryCookie();
+    if (COUNTRY_CODES.some((c) => c.code === cc)) {
+      setCountryCode(cc);
+    }
+  }, []);
 
   // Restore mobile number and OTP state from context on mount
   useEffect(() => {
@@ -580,9 +613,13 @@ const DetailsStep = () => {
   };
 
   const handleSendOTP = async () => {
-    // Validate mobile number
-    if (!mobileNumber || mobileNumber.length !== 10) {
-      setErrorMessage("Please enter a valid 10-digit mobile number");
+    // Validate mobile number for the selected country
+    if (!isMobileLenValid) {
+      setErrorMessage(
+        `Please enter a valid mobile number (${selectedCountry.min}${
+          selectedCountry.min !== selectedCountry.max ? `-${selectedCountry.max}` : ""
+        } digits)`
+      );
       return;
     }
 
@@ -591,10 +628,10 @@ const DetailsStep = () => {
       setSuccessMessage(null);
       dispatch(clearError());
 
-      console.log("📡 Sending OTP to mobile number:", mobileNumber);
-      // Dispatch the sendOtp action
+      console.log("📡 Sending OTP to mobile number:", e164Mobile);
+      // Dispatch the sendOtp action with E.164 (dial + national)
 
-      await dispatch(sendOtp(mobileNumber)).unwrap();
+      await dispatch(sendOtp(e164Mobile)).unwrap();
 
       // Reset OTP fields
       setOtp(["", "", "", ""]);
@@ -625,9 +662,13 @@ const DetailsStep = () => {
   };
 
   const handleResendOtp = async () => {
-    // Validate mobile number
-    if (!mobileNumber || mobileNumber.length !== 10) {
-      setErrorMessage("Please enter a valid 10-digit mobile number");
+    // Validate mobile number for the selected country
+    if (!isMobileLenValid) {
+      setErrorMessage(
+        `Please enter a valid mobile number (${selectedCountry.min}${
+          selectedCountry.min !== selectedCountry.max ? `-${selectedCountry.max}` : ""
+        } digits)`
+      );
       return;
     }
 
@@ -640,8 +681,8 @@ const DetailsStep = () => {
       // Reset timer
       setResendSeconds(120);
 
-      // Call send OTP API
-      await dispatch(sendOtp(mobileNumber)).unwrap();
+      // Call send OTP API with E.164
+      await dispatch(sendOtp(e164Mobile)).unwrap();
 
       // Reset OTP fields
       setOtp(["", "", "", ""]);
@@ -684,9 +725,9 @@ const DetailsStep = () => {
 
       const fcmToken = "";
 
-      // Call verify OTP API
+      // Call verify OTP API with E.164 (matches what was sent)
       const result = await dispatch(
-        verifyOtp({ mobileNumber, otp: otpString, fcmToken }),
+        verifyOtp({ mobileNumber: e164Mobile, otp: otpString, fcmToken }),
       ).unwrap();
 
       console.log("User role:", result?.data?.user?.role);
@@ -817,8 +858,9 @@ const DetailsStep = () => {
 
   const handleMobileNumberChange = (e) => {
     const value = e.target.value;
-    // Only allow numbers and max 10 digits
-    if (/^\d{0,10}$/.test(value)) {
+    // Only allow numbers, capped at the selected country's max length
+    const max = selectedCountry.max;
+    if (new RegExp(`^\\d{0,${max}}$`).test(value)) {
       setMobileNumber(value);
 
       // Reset OTP step if mobile number changes
@@ -948,60 +990,174 @@ const DetailsStep = () => {
           </Box>
         </Typography>
 
-        <Box sx={{ position: "relative" }}>
-          <TextField
-            fullWidth
+        <Box
+          sx={{
+            position: "relative",
+            display: "flex",
+            alignItems: "stretch",
+            backgroundColor: otpSent ? "#F9FAFB" : "#fff",
+            border: "1px solid #E5E7EB",
+            borderRadius: { xs: "8px", sm: "12px" },
+            "&:hover": { borderColor: otpSent ? "#E5E7EB" : "#D1D5DB" },
+            "&:focus-within": {
+              borderColor: "#45A735",
+            },
+          }}
+        >
+          {/* Country code picker */}
+          <Box
+            component="button"
+            type="button"
+            onClick={() => !otpSent && setShowCountryPicker((v) => !v)}
+            disabled={otpSent}
+            aria-haspopup="listbox"
+            aria-expanded={showCountryPicker}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+              borderRight: "1px solid #E5E7EB",
+              px: { xs: 1.25, sm: 1.5 },
+              fontSize: { xs: "13px", sm: "14px" },
+              color: "#374151",
+              background: "transparent",
+              border: "none",
+              cursor: otpSent ? "not-allowed" : "pointer",
+              minWidth: { xs: "84px", sm: "96px" },
+              fontFamily: "inherit",
+            }}
+          >
+            <Box component="span" sx={{ fontSize: "16px" }}>
+              {selectedCountry.flag}
+            </Box>
+            <Box component="span" sx={{ fontWeight: 500 }}>
+              {selectedCountry.dial}
+            </Box>
+            <Box
+              component="svg"
+              width={10}
+              height={10}
+              viewBox="0 0 24 24"
+              sx={{ color: "#9CA3AF", ml: "2px" }}
+            >
+              <path
+                d="M6 9l6 6 6-6"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </Box>
+          </Box>
+
+          {showCountryPicker && (
+            <Box
+              role="listbox"
+              sx={{
+                position: "absolute",
+                top: "calc(100% + 4px)",
+                left: 0,
+                zIndex: 30,
+                backgroundColor: "#fff",
+                border: "1px solid #E5E7EB",
+                borderRadius: "12px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+                minWidth: "240px",
+                maxHeight: "280px",
+                overflowY: "auto",
+              }}
+            >
+              {COUNTRY_CODES.map((c) => (
+                <Box
+                  component="button"
+                  type="button"
+                  role="option"
+                  key={c.code}
+                  aria-selected={c.code === countryCode}
+                  onClick={() => {
+                    setCountryCode(c.code);
+                    setShowCountryPicker(false);
+                    // Reset mobile if it overflows the new country's max
+                    if (mobileNumber.length > c.max) {
+                      setMobileNumber("");
+                    }
+                  }}
+                  sx={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                    px: 1.5,
+                    py: 1.25,
+                    textAlign: "left",
+                    fontSize: "14px",
+                    color: c.code === countryCode ? "#26472B" : "#484848",
+                    background: c.code === countryCode ? "#F2F9F1" : "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    "&:hover": { background: "#F2F9F1" },
+                  }}
+                >
+                  <Box component="span" sx={{ fontSize: "18px" }}>
+                    {c.flag}
+                  </Box>
+                  <Box
+                    component="span"
+                    sx={{
+                      flex: 1,
+                      fontWeight: c.code === countryCode ? 600 : 400,
+                    }}
+                  >
+                    {c.name}
+                  </Box>
+                  <Box component="span" sx={{ color: "#9CA3AF" }}>
+                    {c.dial}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          <Box
+            component="input"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="off"
+            name="qh-booking-mobile"
             placeholder={t('enterMobileNumber')}
             value={mobileNumber}
             onChange={handleMobileNumberChange}
             disabled={otpSent}
+            maxLength={selectedCountry.max}
             sx={{
-              "& .MuiOutlinedInput-root": {
-                fontSize: { xs: "13px", sm: "14px", md: "14px" },
-                backgroundColor: "#fff",
-                borderRadius: { xs: "8px", sm: "12px" },
-                paddingRight: { xs: "90px", sm: "100px" },
-                "& fieldset": {
-                  borderColor: "#E5E7EB",
-                },
-                "&:hover fieldset": {
-                  borderColor: "#D1D5DB",
-                },
-                "&.Mui-focused fieldset": {
-                  borderColor: "#45A735",
-                  borderWidth: "1px",
-                },
-                "&.Mui-disabled": {
-                  backgroundColor: "#F9FAFB",
-                },
-              },
-              "& .MuiOutlinedInput-input": {
-                padding: { xs: "12px 14px", sm: "14px 16px" },
-                color: "#1F2937",
-                "&::placeholder": {
-                  color: "#9CA3AF",
-                  opacity: 1,
-                },
-              },
+              flex: 1,
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              fontSize: { xs: "13px", sm: "14px" },
+              color: "#1F2937",
+              padding: { xs: "12px 14px", sm: "14px 16px" },
+              fontFamily: "inherit",
+              "&::placeholder": { color: "#9CA3AF", opacity: 1 },
+              "&:disabled": { color: "#6B7280" },
             }}
           />
 
           {/* Send OTP Button */}
           <Button
             onClick={handleSendOTP}
-            disabled={mobileNumber.length !== 10 || otpSent}
+            disabled={!isMobileLenValid || otpSent}
             sx={{
-              position: "absolute",
-              right: { xs: "8px", sm: "10px" },
-              top: "50%",
-              transform: "translateY(-50%)",
               fontSize: { xs: "12px", sm: "13px", md: "14px" },
               fontWeight: 600,
               color: "#45A735",
               textTransform: "none",
-              padding: { xs: "4px 8px", sm: "6px 10px" },
+              px: { xs: 1.25, sm: 1.5 },
               minWidth: "auto",
               backgroundColor: "transparent",
+              borderRadius: 0,
               "&:hover": {
                 backgroundColor: "rgba(69, 167, 53, 0.04)",
               },
@@ -1010,7 +1166,7 @@ const DetailsStep = () => {
               },
             }}
           >
-            {otpVerified ? t('verified') : t('sendOtp')}
+            {otpVerified ? t('verified') : otpSent ? t('otpSent') || "OTP Sent" : t('sendOtp')}
           </Button>
         </Box>
       </Box>
@@ -1049,8 +1205,12 @@ const DetailsStep = () => {
                 onChange={(e) => handleOtpChange(index, e.target.value)}
                 onKeyDown={(e) => handleOtpKeyDown(index, e)}
                 disabled={!otpSent || isLoading}
+                autoComplete="off"
+                name={`qh-booking-otp-${index}`}
                 inputProps={{
                   maxLength: 1,
+                  inputMode: "numeric",
+                  autoComplete: "off",
                   style: { textAlign: "center" },
                 }}
                 sx={{
