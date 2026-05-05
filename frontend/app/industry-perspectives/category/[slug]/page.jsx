@@ -25,28 +25,34 @@ async function getPosts(categorySlug, lang = 'en', country = 'IN', page = 1) {
   } catch { return { posts: [], total: 0, pages: 1 }; }
 }
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params, searchParams }) {
-  const lang = searchParams?.lang || 'en';
-  const cat  = await getCategory(params.slug, lang, searchParams?.country || 'IN');
-  const name = cat?.name?.[lang] || cat?.name?.en || params.slug;
+  const { slug } = await params;
+  const sp = await searchParams;
+  const lang = sp?.lang || 'en';
+  const cat  = await getCategory(slug);
+  const name = cat?.name?.[lang] || cat?.name?.en || slug;
   return {
     title: `${name} — Industry Perspectives | QuickHire`,
     description: cat?.description?.[lang] || cat?.description?.en || `Browse ${name} articles on QuickHire Industry Perspectives.`,
-    alternates: { canonical: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/industry-perspectives/category/${params.slug}` },
+    alternates: { canonical: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/industry-perspectives/category/${slug}` },
   };
 }
 
 export default async function CategoryPage({ params, searchParams }) {
-  const lang    = searchParams?.lang    || 'en';
-  const country = searchParams?.country || 'IN';
-  const page    = Number(searchParams?.page) || 1;
+  const { slug } = await params;
+  const sp = await searchParams;
+  const lang    = sp?.lang    || 'en';
+  const country = sp?.country || 'IN';
+  const page    = Number(sp?.page) || 1;
 
   const [cat, { posts, total, pages }] = await Promise.all([
-    getCategory(params.slug, lang, country),
-    getPosts(params.slug, lang, country, page),
+    getCategory(slug),
+    getPosts(slug, lang, country, page),
   ]);
 
-  const name = cat?.name?.[lang] || cat?.name?.en || params.slug;
+  const name = cat?.name?.[lang] || cat?.name?.en || slug;
   const desc = cat?.description?.[lang] || cat?.description?.en || '';
 
   return (
@@ -96,19 +102,19 @@ export default async function CategoryPage({ params, searchParams }) {
             {pages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-12">
                 {page > 1 && (
-                  <Link href={`/industry-perspectives/category/${params.slug}?page=${page - 1}${lang !== 'en' ? `&lang=${lang}` : ''}${country !== 'IN' ? `&country=${country}` : ''}`}
+                  <Link href={`/industry-perspectives/category/${slug}?page=${page - 1}${lang !== 'en' ? `&lang=${lang}` : ''}${country !== 'IN' ? `&country=${country}` : ''}`}
                         className="px-4 py-2 rounded-lg border border-[#D0E8CB] text-[#45A735] font-medium hover:bg-[#F2F9F1] transition-colors text-sm">
                     ← Prev
                   </Link>
                 )}
                 {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
-                  <Link key={p} href={`/industry-perspectives/category/${params.slug}?page=${p}${lang !== 'en' ? `&lang=${lang}` : ''}${country !== 'IN' ? `&country=${country}` : ''}`}
+                  <Link key={p} href={`/industry-perspectives/category/${slug}?page=${p}${lang !== 'en' ? `&lang=${lang}` : ''}${country !== 'IN' ? `&country=${country}` : ''}`}
                         className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${p === page ? 'bg-[#45A735] text-white' : 'border border-[#D0E8CB] text-[#45A735] hover:bg-[#F2F9F1]'}`}>
                     {p}
                   </Link>
                 ))}
                 {page < pages && (
-                  <Link href={`/industry-perspectives/category/${params.slug}?page=${page + 1}${lang !== 'en' ? `&lang=${lang}` : ''}${country !== 'IN' ? `&country=${country}` : ''}`}
+                  <Link href={`/industry-perspectives/category/${slug}?page=${page + 1}${lang !== 'en' ? `&lang=${lang}` : ''}${country !== 'IN' ? `&country=${country}` : ''}`}
                         className="px-4 py-2 rounded-lg border border-[#D0E8CB] text-[#45A735] font-medium hover:bg-[#F2F9F1] transition-colors text-sm">
                     Next →
                   </Link>

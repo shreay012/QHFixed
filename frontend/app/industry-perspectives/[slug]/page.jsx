@@ -58,8 +58,10 @@ async function getRelated(post, lang, country) {
 }
 
 export async function generateMetadata({ params, searchParams }) {
-  const lang = searchParams?.lang || 'en';
-  const post = await getPost(params.slug, searchParams?.country || 'IN');
+  const p  = await params;
+  const sp = await searchParams;
+  const lang = sp?.lang || 'en';
+  const post = await getPost(p.slug, sp?.country || 'IN');
   if (!post) return { title: 'Article not found — Industry Perspectives' };
   const seo   = post.seo?.[lang] || post.seo?.en || {};
   const title = seo.metaTitle || post.title?.[lang] || post.title?.en || '';
@@ -73,9 +75,11 @@ export async function generateMetadata({ params, searchParams }) {
 }
 
 export default async function ArticlePage({ params, searchParams }) {
-  const lang    = searchParams?.lang    || 'en';
-  const country = searchParams?.country || 'IN';
-  const post    = await getPost(params.slug, country);
+  const p  = await params;
+  const sp = await searchParams;
+  const lang    = sp?.lang    || 'en';
+  const country = sp?.country || 'IN';
+  const post    = await getPost(p.slug, country);
 
   if (!post) {
     return (
@@ -83,7 +87,7 @@ export default async function ArticlePage({ params, searchParams }) {
         <div className="text-6xl mb-5">📰</div>
         <h1 className="text-2xl font-bold text-[#1a2e1a] mb-2">Article not found</h1>
         <p className="text-[#6b7280] mb-6">
-          No published post with slug &quot;{params.slug}&quot;.<br/>
+          No published post with slug &quot;{p.slug}&quot;.<br/>
           Check that it&apos;s published in admin.
         </p>
         <Link href="/industry-perspectives" className="bg-[#45A735] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#3a9028] transition-colors">
