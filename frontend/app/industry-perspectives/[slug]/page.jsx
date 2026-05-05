@@ -4,11 +4,15 @@ import Link from 'next/link';
 import { getDb } from '@/lib/blog/mongoClient';
 import { ObjectId } from 'mongodb';
 
+export const dynamic = 'force-dynamic';
+
 async function getPost(slug, lang = 'en', country = 'IN') {
   try {
     const db   = await getDb();
-    const post = await db.collection('blog_posts').findOne({ slug, status: 'published' });
-    if (!post) return null;
+    // Try published first, then any status for better error messages
+    const post = await db.collection('blog_posts').findOne({ slug });
+    if (!post) { console.error(`[blog] slug not found in DB: ${slug}`); return null; }
+    if (post.status !== 'published') { console.error(`[blog] post "${slug}" status is "${post.status}" not published`); return null; }
     const catIds  = (post.categories || []).map(id => { try { return new ObjectId(id); } catch { return null; } }).filter(Boolean);
     const catDocs = catIds.length ? await db.collection('blog_categories').find({ _id: { $in: catIds } }).toArray() : [];
     db.collection('blog_posts').updateOne({ slug }, { $inc: { viewCount: 1 } }).catch(() => {});
