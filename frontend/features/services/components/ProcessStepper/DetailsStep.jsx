@@ -791,8 +791,9 @@ const DetailsStep = () => {
       return;
     }
 
-    const dummyOtp = ["1", "2", "3", "4"];
-    setOtp(dummyOtp);
+    const nextOtp = [...otp];
+    nextOtp[index] = cleaned;
+    setOtp(nextOtp);
 
     if (errorMessage) {
       setErrorMessage(null);
@@ -802,8 +803,8 @@ const DetailsStep = () => {
       otpRefs[index + 1].current?.focus();
     }
 
-    if (!isLoading && otpSent) {
-      handleVerifyOtp(dummyOtp.join(""));
+    if (!isLoading && otpSent && nextOtp.every((d) => d !== "")) {
+      handleVerifyOtp(nextOtp.join(""));
     }
   };
 
