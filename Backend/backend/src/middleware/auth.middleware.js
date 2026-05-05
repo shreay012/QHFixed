@@ -92,6 +92,12 @@ export async function authMiddleware(req, _res, next) {
     if (req.method === 'GET' && PUBLIC_PREFIXES.some((p) => req.path === p || req.path.startsWith(p + '/'))) {
           return next();
     }
+    // Internal service key — allows Vercel proxy to call blog/public routes
+    // without a user JWT. Set BLOG_API_KEY on both Render and Vercel.
+    if (env.BLOG_API_KEY && req.header('x-blog-api-key') === env.BLOG_API_KEY) {
+      req.user = { id: 'blog-service', role: 'viewer', sessionId: null };
+      return next();
+    }
 
   const header = req.header('authorization') || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;

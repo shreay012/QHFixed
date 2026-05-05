@@ -72,6 +72,7 @@ const schema = z.object({
   SENTRY_DSN: z.string().optional(),
   APP_VERSION: z.string().default('0.0.0'),
   ANTHROPIC_API_KEY: z.string().optional(),
+  BLOG_API_KEY: z.string().optional(),
   MEILISEARCH_URL: z.string().default('http://localhost:7700'),
   MEILISEARCH_KEY: z.string().optional(),
 
