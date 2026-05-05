@@ -106,7 +106,7 @@ const Footer = () => {
               }}
             >
               <Link
-                href={BLOG_BASE ? `${BLOG_BASE}/industry-perspectives/` : "#"}
+                href="/industry-perspectives"
                 style={{ textDecoration: "none" }}
               >
                 <Typography

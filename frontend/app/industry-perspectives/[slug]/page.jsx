@@ -6,16 +6,22 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 async function getPost(slug, lang = 'en', country = 'IN') {
   try {
-    const res = await fetch(`${API}/blog/posts/${slug}?lang=${lang}&country=${country}`, { next: { revalidate: 300 } });
-    if (!res.ok) return null;
+    const res = await fetch(`${API}/blog/posts/${slug}?lang=${lang}&country=${country}`, { cache: 'no-store' });
+    if (!res.ok) {
+      console.error(`[blog] getPost ${slug} → HTTP ${res.status}`);
+      return null;
+    }
     return (await res.json()).data;
-  } catch { return null; }
+  } catch (e) {
+    console.error(`[blog] getPost ${slug} fetch error:`, e?.message);
+    return null;
+  }
 }
 
 async function getRelated(cats = [], excludeSlug = '', lang = 'en', country = 'IN') {
   if (!cats.length) return [];
   try {
-    const res = await fetch(`${API}/blog/posts?category=${cats[0]}&lang=${lang}&country=${country}&limit=4`, { next: { revalidate: 300 } });
+    const res = await fetch(`${API}/blog/posts?category=${cats[0]}&lang=${lang}&country=${country}&limit=4`, { cache: 'no-store' });
     return ((await res.json()).data || []).filter(p => p.slug !== excludeSlug).slice(0, 3);
   } catch { return []; }
 }
