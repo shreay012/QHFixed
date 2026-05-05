@@ -5,8 +5,6 @@ const withNextIntl = createNextIntlPlugin('./i18n.js');
 const nextConfig = {
   // Build output directory (both dev cache and production build)
   distDir: 'build',
-  // Standalone output for Docker — bundles everything needed to run without node_modules
-  output: 'standalone',
 
   // Page extensions
   pageExtensions: ['js', 'jsx'],

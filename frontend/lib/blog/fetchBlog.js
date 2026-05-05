@@ -11,10 +11,9 @@ function b64url(buf) {
 }
 
 function makeServiceToken() {
-  const rawKey = process.env.JWT_PRIVATE_KEY;
+  const rawKey = (process.env.JWT_PRIVATE_KEY || '').replace(/\\n/g, '\n');
   if (!rawKey) return null;
-  const key = rawKey.replace(/\\n/g, '\n');
-  const alg  = process.env.JWT_ALGORITHM || (key.includes('-----') ? 'RS256' : 'HS256');
+  const alg = process.env.JWT_ALGORITHM || (rawKey.includes('-----') ? 'RS256' : 'HS256');
   const now  = Math.floor(Date.now() / 1000);
   const payload = {
     sub: 'blog-service',
@@ -30,11 +29,11 @@ function makeServiceToken() {
   try {
     let sig;
     if (alg === 'HS256') {
-      sig = b64url(crypto.createHmac('sha256', key).update(unsigned).digest());
+      sig = b64url(crypto.createHmac('sha256', rawKey).update(unsigned).digest());
     } else {
       const sign = crypto.createSign('RSA-SHA256');
       sign.update(unsigned);
-      sig = b64url(Buffer.from(sign.sign(key, 'base64'), 'base64'));
+      sig = b64url(Buffer.from(sign.sign(rawKey, 'base64'), 'base64'));
     }
     return `${unsigned}.${sig}`;
   } catch { return null; }
@@ -42,11 +41,13 @@ function makeServiceToken() {
 
 function authHeader() {
   const token = makeServiceToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (token) return { Authorization: `Bearer ${token}` };
+  console.warn('[blog] JWT_PRIVATE_KEY not set on Vercel — blog requests will get 401');
+  return {};
 }
 
 export async function blogFetchPosts(params = {}) {
-  const sp = new URLSearchParams(params);
+  const sp  = new URLSearchParams(params);
   const res = await fetch(`${BACKEND}/blog/posts?${sp}`, {
     headers: authHeader(),
     cache: 'no-store',
