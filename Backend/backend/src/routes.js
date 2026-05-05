@@ -32,6 +32,7 @@ import chatbotRoutes from './modules/chatbot/chatbot.routes.js';
 import searchRoutes from './modules/search/search.routes.js';
 import legalRoutes from './modules/legal/legal.routes.js';
 import blogRoutes from './modules/blog/blog.routes.js';
+import seoRoutes from './modules/seo/seo.routes.js';
 
 const r = Router();
 r.use('/auth', authRoutes);
@@ -70,5 +71,6 @@ r.use('/chatbot', chatbotRoutes);
 r.use('/search', searchRoutes);
 r.use('/legal', legalRoutes);
 r.use('/blog', blogRoutes);
+r.use('/admin/seo', seoRoutes);
 
 export default r;

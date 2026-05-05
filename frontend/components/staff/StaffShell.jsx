@@ -33,9 +33,10 @@ import { staffAuth } from '@/lib/axios/staffApi';
 import GlobalSearch from './GlobalSearch';
 
 const ROLE_META = {
-  admin:    { label: 'Admin',           tag: 'Admin Console' },
-  pm:       { label: 'Project Manager', tag: 'PM Workspace' },
-  resource: { label: 'Resource',        tag: 'My Workspace' },
+  admin:    { label: 'Admin',       tag: 'Admin Console' },
+  pm:       { label: 'Project Mgr', tag: 'PM Workspace' },
+  resource: { label: 'Resource',    tag: 'My Workspace' },
+  seo:      { label: 'SEO Manager', tag: 'SEO Console' },
 };
 
 // Map known admin path prefixes → human label, used by the auto-breadcrumb.
@@ -92,7 +93,7 @@ function deriveCrumbs(pathname, role) {
   return items;
 }
 
-export default function StaffShell({ role, links, children }) {
+export default function StaffShell({ role, allowedRoles, homeHref, links, children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState(null);
@@ -107,7 +108,8 @@ export default function StaffShell({ role, links, children }) {
   // effective ordering, just defers the state update by one tick.
   useEffect(() => {
     const u = staffAuth.getUser();
-    if (!u || u.role !== role) {
+    const allowed = allowedRoles || [role];
+    if (!u || !allowed.includes(u.role)) {
       router.replace(`/staff-login?role=${role}`);
       return;
     }
@@ -179,7 +181,7 @@ export default function StaffShell({ role, links, children }) {
   const SidebarBody = (
     <>
       <div className="px-5 pt-5 pb-4 border-b border-[#E5F1E2]">
-        <Link href={`/${role}`} className="flex items-center gap-2.5">
+        <Link href={homeHref || `/${role}`} className="flex items-center gap-2.5">
           <Image src="/quickhire-logo.svg" alt="QuickHire" width={32} height={32} priority />
           <div>
             <div className="text-[15px] font-open-sauce-bold text-[#26472B] leading-tight">QuickHire</div>

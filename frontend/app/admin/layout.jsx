@@ -229,6 +229,40 @@ const links = [
     ),
   },
 
+  // ── SEO ─────────────────────────────────────────────────────────────────
+  { type: 'section', label: 'SEO' },
+  {
+    href: '/seo-admin',
+    label: 'SEO Dashboard',
+    icon: (
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx={11} cy={11} r={8} /><path d="M21 21l-4.35-4.35" />
+      </svg>
+    ),
+  },
+  {
+    href: '/seo-admin/pages',
+    label: 'Page SEO',
+    icon: (
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+      </svg>
+    ),
+  },
+  {
+    href: '/seo-admin/redirects',
+    label: 'Redirects',
+    icon: (
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="17 1 21 5 17 9" />
+        <path d="M3 11V9a4 4 0 014-4h14" />
+        <polyline points="7 23 3 19 7 15" />
+        <path d="M21 13v2a4 4 0 01-4 4H3" />
+      </svg>
+    ),
+  },
+
   // ── PLATFORM ────────────────────────────────────────────────────────────
   { type: 'section', label: 'Platform' },
   {
