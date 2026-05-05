@@ -297,6 +297,45 @@ const SummaryStep = () => {
   const showTaxLine = taxAmount > 0 && taxRate > 0 && taxType !== 'none';
   const taxLabel    = `${taxName}${taxRate > 0 ? ` (${(taxRate * 100).toFixed(0)}%)` : ''}`;
 
+  // Opens Razorpay modal with the order data from backend
+  const openRazorpay = (paymentData, resolvedJobId) => {
+    return new Promise((resolve, reject) => {
+      const options = {
+        key: paymentData.keyId,
+        amount: paymentData.amount * 100,
+        currency: paymentData.currency,
+        name: "QuickHire",
+        description: "Service Booking Payment",
+        order_id: paymentData.razorpayOrderId,
+        handler: async (response) => {
+          try {
+            await paymentService.getPaymentStatus(paymentData.paymentId);
+          } catch {}
+          localStorage.removeItem("_current_job_id");
+          localStorage.removeItem("_pricing_data");
+          router.push(`/payment-success?jobId=${resolvedJobId}`);
+          resolve();
+        },
+        prefill: {
+          name: paymentData.userDetails?.name || "",
+          email: paymentData.userDetails?.email || "",
+          contact: paymentData.userDetails?.mobile || "",
+        },
+        notes: {
+          jobId: resolvedJobId,
+          bookingType: paymentData.bookingType,
+          gstNumber: gstNumber || "N/A",
+        },
+        theme: { color: "#45A735" },
+        modal: { ondismiss: () => reject(new Error("dismissed")) },
+      };
+      if (!window.Razorpay) { reject(new Error("Razorpay SDK not loaded")); return; }
+      const rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", (resp) => reject(new Error(resp?.error?.description || "Payment failed")));
+      rzp.open();
+    });
+  };
+
   // Handle Continue - Check login and open Razorpay for logged-in users
   const handleContinue = async () => {
     if (!termsAccepted) return;
@@ -368,7 +407,12 @@ const SummaryStep = () => {
             router.push(`/payment-success?jobId=${existingJobId}`);
             return;
           }
-          setIsProcessingPayment(false);
+          try {
+            await openRazorpay(paymentData, existingJobId);
+          } catch (e) {
+            setIsProcessingPayment(false);
+            if (e?.message !== "dismissed") showError("Payment failed. Please try again.");
+          }
           return;
         }
 
@@ -423,7 +467,12 @@ const SummaryStep = () => {
           router.push(`/payment-success?jobId=${newJobId}`);
           return;
         }
-        setIsProcessingPayment(false);
+        try {
+          await openRazorpay(paymentData, newJobId);
+        } catch (e) {
+          setIsProcessingPayment(false);
+          if (e?.message !== "dismissed") showError("Payment failed. Please try again.");
+        }
         return;
       } catch (e) {
         console.error("❌ Job creation failed:", e);
