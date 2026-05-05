@@ -1,18 +1,27 @@
 import BlogCard from '@/features/blog/components/BlogCard';
 import Link from 'next/link';
-import { blogFetchCategories, blogFetchPosts } from '@/lib/blog/fetchBlog';
+import { getDb } from '@/lib/blog/mongoClient';
+import { ObjectId } from 'mongodb';
 
-async function getCategory(slug, lang = 'en') {
+async function getCategory(slug) {
   try {
-    const json = await blogFetchCategories(lang);
-    return (json.data || []).find(c => c.slug === slug) || null;
+    const db  = await getDb();
+    const cat = await db.collection('blog_categories').findOne({ slug, active: true });
+    return cat ? { ...cat, _id: String(cat._id) } : null;
   } catch { return null; }
 }
 
 async function getPosts(categorySlug, lang = 'en', country = 'IN', page = 1) {
   try {
-    const json = await blogFetchPosts({ category: categorySlug, lang, country, page, limit: 12 });
-    return { posts: json.data || [], total: json.meta?.total || 0, pages: json.meta?.totalPages || 1 };
+    const db    = await getDb();
+    const cat   = await db.collection('blog_categories').findOne({ slug: categorySlug, active: true });
+    const filter = { status: 'published', ...(cat ? { categories: String(cat._id) } : {}) };
+    const limit = 12; const skip = (page - 1) * limit;
+    const [raw, total] = await Promise.all([
+      db.collection('blog_posts').find(filter).sort({ publishedAt: -1 }).skip(skip).limit(limit).toArray(),
+      db.collection('blog_posts').countDocuments(filter),
+    ]);
+    return { posts: raw.map(p => ({ ...p, _id: String(p._id) })), total, pages: Math.ceil(total / limit) };
   } catch { return { posts: [], total: 0, pages: 1 }; }
 }
 

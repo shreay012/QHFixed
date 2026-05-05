@@ -1,12 +1,18 @@
 import BlogDetail from '@/features/blog/components/BlogDetail';
 import BlogCard from '@/features/blog/components/BlogCard';
 import Link from 'next/link';
-import { blogFetchPost, blogFetchPosts } from '@/lib/blog/fetchBlog';
+import { getDb } from '@/lib/blog/mongoClient';
+import { ObjectId } from 'mongodb';
 
 async function getPost(slug, lang = 'en', country = 'IN') {
   try {
-    const json = await blogFetchPost(slug, lang, country);
-    return json.data || null;
+    const db   = await getDb();
+    const post = await db.collection('blog_posts').findOne({ slug, status: 'published' });
+    if (!post) return null;
+    const catIds  = (post.categories || []).map(id => { try { return new ObjectId(id); } catch { return null; } }).filter(Boolean);
+    const catDocs = catIds.length ? await db.collection('blog_categories').find({ _id: { $in: catIds } }).toArray() : [];
+    db.collection('blog_posts').updateOne({ slug }, { $inc: { viewCount: 1 } }).catch(() => {});
+    return { ...post, _id: String(post._id), coverImage: (country && post.coverImageByCountry?.[country]) || post.coverImage || '', categoriesData: catDocs };
   } catch (e) {
     console.error(`[blog] getPost ${slug}:`, e?.message);
     return null;
@@ -16,8 +22,11 @@ async function getPost(slug, lang = 'en', country = 'IN') {
 async function getRelated(cats = [], excludeSlug = '', lang = 'en', country = 'IN') {
   if (!cats.length) return [];
   try {
-    const json = await blogFetchPosts({ category: cats[0], lang, country, limit: 4 });
-    return (json.data || []).filter(p => p.slug !== excludeSlug).slice(0, 3);
+    const db  = await getDb();
+    const cat = await db.collection('blog_categories').findOne({ slug: cats[0], active: true });
+    const filter = { status: 'published', ...(cat ? { categories: String(cat._id) } : {}) };
+    const raw = await db.collection('blog_posts').find(filter).sort({ publishedAt: -1 }).limit(4).toArray();
+    return raw.filter(p => p.slug !== excludeSlug).slice(0, 3).map(p => ({ ...p, _id: String(p._id) }));
   } catch { return []; }
 }
 
