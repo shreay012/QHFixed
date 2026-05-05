@@ -134,11 +134,20 @@ function IndustryPerspectivesInner() {
       if (activeTag)   p.set('tag', activeTag);
       if (debouncedQ)  p.set('search', debouncedQ);
       const res  = await fetch(`${BASE}/blog/posts?${p}`);
-      if (!res.ok) { setFetchError(true); setPosts([]); return; }
+      if (!res.ok) {
+        console.error(`[blog] list fetch HTTP ${res.status}`);
+        setFetchError(res.status);
+        setPosts([]);
+        return;
+      }
       const json = await res.json();
       setPosts(json.data || []);
       setMeta(json.meta || null);
-    } catch { setFetchError(true); setPosts([]); }
+    } catch (e) {
+      console.error('[blog] list fetch error:', e?.message);
+      setFetchError('network');
+      setPosts([]);
+    }
     finally { setLoading(false); }
   }, [country, lang, page, activeCat, activeTag, debouncedQ]);
 
@@ -239,7 +248,13 @@ function IndustryPerspectivesInner() {
               <>
                 <div className="text-6xl mb-5">⚠️</div>
                 <h2 className="text-xl font-bold text-[#1a2e1a] mb-2">Could not load articles</h2>
-                <p className="text-[#6b7280] text-sm mb-4">Backend is not reachable. Check Render deployment.</p>
+                <p className="text-[#6b7280] text-sm mb-4">
+                  {fetchError === 401
+                    ? 'Authentication error (401) — backend auth config needs update.'
+                    : fetchError === 'network'
+                    ? 'Backend is not reachable. Render may be sleeping or crashed.'
+                    : `Backend returned HTTP ${fetchError}. Check Render logs.`}
+                </p>
                 <button onClick={() => load()} className="text-[#45A735] text-sm hover:underline">Retry →</button>
               </>
             ) : (
