@@ -59,7 +59,7 @@ function bookingPathForRole(role, bookingId) {
   if (role === 'resource') return `/resource/assignments/${bookingId}`;
   if (STAFF_ROLES.has(role)) return `/admin/bookings/${bookingId}`;
   // default: customer
-  return `/booking-ongoing/${bookingId}`;
+  return `/booking-workspace/${bookingId}`;
 }
 
 /**

@@ -152,10 +152,10 @@ export function SocketProvider({ children }) {
     // Resolve the deep link the user should land on if they tap this toast.
     // The route depends on BOTH the payload (bookingId/jobId/roomId) and the
     // current role — e.g. a CHAT_MESSAGE for booking #123 lands a customer
-    // on /booking-ongoing/123 but a PM on /pm/bookings/123.
+    // on /booking-workspace/123 but a PM on /pm/bookings/123.
     const role = userStateRef.current?.user?.role || 'user';
     // Apply the active country prefix so an in-DE user clicking a toast on
-     // any page lands on /de/booking-ongoing/<id> directly instead of being
+     // any page lands on /de/booking-workspace/<id> directly instead of being
      // redirected by the proxy.
     const baseRoute = resolveNotificationRoute(data, role);
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
