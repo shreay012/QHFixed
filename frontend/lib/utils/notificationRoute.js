@@ -129,10 +129,24 @@ export function resolveNotificationRoute(notification, role = 'user') {
 
 /**
  * Read the current user role from localStorage. Centralised here so callers
- * (toast + list) stay in sync. Falls back to 'user' for anonymous browsing.
+ * (toast + list) stay in sync.
+ *
+ * Staff sessions (admin / pm / resource) live under `qh_staff_user` and take
+ * precedence — checked first so an admin in a tab that also has a customer
+ * session lingering doesn't get routed to the customer surface.
+ * Falls back to 'user' for anonymous browsing.
  */
 export function readCurrentRole() {
   if (typeof window === 'undefined') return 'user';
+  // 1. Staff session (admin / pm / resource / etc.) — check first
+  try {
+    const staff = window.localStorage.getItem('qh_staff_user');
+    if (staff) {
+      const u = JSON.parse(staff);
+      if (u?.role) return String(u.role);
+    }
+  } catch { /* ignore */ }
+  // 2. Customer session
   try {
     const raw = window.localStorage.getItem('user');
     if (raw) {
@@ -140,7 +154,7 @@ export function readCurrentRole() {
       if (u?.role) return String(u.role);
     }
   } catch { /* ignore parse errors */ }
-  // staff sessions sometimes mark role via userType
+  // 3. Legacy fallback
   const userType = window.localStorage.getItem('userType');
   if (userType) return String(userType);
   return 'user';

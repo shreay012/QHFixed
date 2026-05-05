@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import chatSocketService from '@/lib/services/chatSocketService';
 import { getCurrentUser } from '@/lib/utils/userHelpers';
-import { resolveNotificationRoute } from '@/lib/utils/notificationRoute';
+import { resolveNotificationRoute, readCurrentRole } from '@/lib/utils/notificationRoute';
 import { withCountryPrefix } from '@/lib/utils/i18nLink';
 import {
   playNotificationSound,
@@ -153,7 +153,10 @@ export function SocketProvider({ children }) {
     // The route depends on BOTH the payload (bookingId/jobId/roomId) and the
     // current role — e.g. a CHAT_MESSAGE for booking #123 lands a customer
     // on /booking-workspace/123 but a PM on /pm/bookings/123.
-    const role = userStateRef.current?.user?.role || 'user';
+    // Use centralised role resolver — checks staff session (qh_staff_user)
+    // first, then customer session, so an admin tab with a stale customer
+    // session doesn't get routed to the customer surface.
+    const role = readCurrentRole();
     // Apply the active country prefix so an in-DE user clicking a toast on
      // any page lands on /de/booking-workspace/<id> directly instead of being
      // redirected by the proxy.
