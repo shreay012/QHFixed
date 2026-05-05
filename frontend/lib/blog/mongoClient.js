@@ -1,25 +1,19 @@
 import { MongoClient } from 'mongodb';
 
-const URI = process.env.MONGO_URI;
-const DB  = process.env.MONGO_DB || 'quickhire';
+const DB = process.env.MONGO_DB || 'quickhire';
 
-if (!URI) throw new Error('MONGO_URI env var not set on Vercel');
+let clientPromise = null;
 
-let client;
-let clientPromise;
-
-if (process.env.NODE_ENV === 'development') {
-  if (!global._mongoClientPromise) {
-    client = new MongoClient(URI);
-    global._mongoClientPromise = client.connect();
-  }
-  clientPromise = global._mongoClientPromise;
-} else {
-  client = new MongoClient(URI);
+function getClientPromise() {
+  if (clientPromise) return clientPromise;
+  const uri = process.env.MONGO_URI;
+  if (!uri) throw new Error('MONGO_URI env var not set on Vercel');
+  const client = new MongoClient(uri);
   clientPromise = client.connect();
+  return clientPromise;
 }
 
 export async function getDb() {
-  const c = await clientPromise;
-  return c.db(DB);
+  const client = await getClientPromise();
+  return client.db(DB);
 }
