@@ -39,3 +39,35 @@ build/
 dist/
 out/
 coverage/
+
+# Personal/AI-generated docs (not part of source)
+Dev doc/
+MD Files/
+Server Doc/
+*_DEPLOYMENT_*.md
+*_SECRETS_*.md
+*_GUIDE_*.md
+DEPLOY_*.md
+DEPLOYMENT_*.md
+ADD_*.md
+START_*.md
+COMPLETE_*.md
+FINAL_*.md
+GET_*.md
+GITHUB_ACTIONS_*.md
+PUSH_*.md
+QUICK_*.md
+RENDER_*.md
+VERCEL_*.md
+EXECUTABLE_*.md
+MASTER_*.md
+README_DEPLOYMENT_*.md
+QuickHire-Deployment-*.md
+YOURE_READY.md
+FIX_GITHUB_AUTH.md
+add-github-secrets.sh
+deploy.sh
+
+# Mac
+.DS_Store
+**/.DS_Store
