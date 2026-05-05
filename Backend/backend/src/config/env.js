@@ -19,6 +19,9 @@ const schema = z.object({
   // existing single-Redis deploys keep working untouched.
   REDIS_URL_QUEUE:  z.string().optional(),
   REDIS_URL_PUBSUB: z.string().optional(),
+  // Set to 'true' to skip BullMQ worker startup entirely (Render free tier
+  // with no dedicated queue Redis). Jobs are silently dropped; app stays up.
+  DISABLE_QUEUE_WORKERS: z.string().optional(),
 
   // Per-queue worker concurrency overrides. Defaults are tuned for ~1M
   // users / ~50K live bookings (see queue/index.js). Lower these for
